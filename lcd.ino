@@ -282,9 +282,19 @@ void setup() {
 }
 
 void loop() {
+    static unsigned long lastButtonCheck = 0;
+    static unsigned long lastUpdate = 0;
+    const unsigned long buttonInterval = 10; // Interwał sprawdzania przycisków (10 ms)
+    const unsigned long updateInterval = 2000; // Interwał aktualizacji danych (2000 ms)
+
+    unsigned long currentTime = millis();
+
     // Obsługa przycisków
-    handleButtons();
-    
+    if (currentTime - lastButtonCheck >= buttonInterval) {
+        handleButtons();
+        lastButtonCheck = currentTime;
+    }
+
     // Rysowanie interfejsu
     display.clearBuffer();
     drawTopBar();
@@ -294,10 +304,9 @@ void loop() {
     drawMainDisplay();
     drawLightStatus();
     display.sendBuffer();
-    
+
     // Symulacja zmiany danych
-    static unsigned long lastUpdate = 0;
-    if (millis() - lastUpdate > 2000) {
+    if (currentTime - lastUpdate >= updateInterval) {
         speed = (speed >= 35.0) ? 0.0 : speed + 0.1;
         tripDistance += 0.1;
         totalDistance += 0.1;
@@ -305,14 +314,46 @@ void loop() {
         power = 100 + random(300);
         energyConsumption += 0.2;
         batteryCapacity = 14.5 - (random(20) / 10.0);
-        
+
         minute = (minute >= 59) ? 0 : minute + 1;
         hour = (minute == 0) ? (hour >= 23 ? 0 : hour + 1) : hour;
         batteryPercent = (batteryPercent <= 0) ? 100 : batteryPercent - 1;
         batteryVoltage = (batteryVoltage <= 42.0) ? 50.0 : batteryVoltage - 0.1;
         assistMode = (assistMode + 1) % 4;
-        lastUpdate = millis();
+        lastUpdate = currentTime;
     }
-    
-    delay(100);
 }
+
+A 
+1 predkosc km/h
+2 predkosc AVG km/h
+3 predkosc MAX km/h
+4 kadencja RPM
+5 kadencja AVG RPM
+B
+1 zasięg km
+2 dystans km
+3 przebieg km
+C
+1 temperatura °C
+2 sterownik °C
+3 silnik °C
+D
+1 moc W
+2 moc AVG W
+3 moc MAX W
+E
+1 bateria V
+2 natężenie A
+3 energia Ah
+4 energia Wh
+5 pojemność %
+F
+1 Ciśnienie bar
+2 Temperatura C
+3 napięcie V
+G
+1 USB on/off
+H
+1 info
+2 kasowanie liczników
