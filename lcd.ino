@@ -324,36 +324,52 @@ void loop() {
     }
 }
 
-A 
-1 predkosc km/h
-2 predkosc AVG km/h
-3 predkosc MAX km/h
-4 kadencja RPM
-5 kadencja AVG RPM
-B
-1 zasięg km
-2 dystans km
-3 przebieg km
-C
-1 temperatura °C
-2 sterownik °C
-3 silnik °C
-D
-1 moc W
-2 moc AVG W
-3 moc MAX W
-E
-1 bateria V
-2 natężenie A
-3 energia Ah
-4 energia Wh
-5 pojemność %
-F
-1 Ciśnienie bar
-2 Temperatura C
-3 napięcie V
-G
-1 USB on/off
-H
-1 info
-2 kasowanie liczników
+/**************************************
+        przełaczanie ekranów A-H przez krótkie naciśnięcia < 1s
+        wejście do ekranu A-H przez długie naciśnięcie <= 1s
+        przełaczanie ekranów 1-x przez krótkie naciśnięcia < 1s
+        wyjscie do ekranu A-H przez długie naciśnięcie >= 1s
+        przełączenie USB przez krótkie naciśnięcie dwóch przycisków UP i DOWN
+        kasowanie liczników przez krótkie naciśnięcie dwóch przycisków UP i DOWN
+            
+        A 
+        1 predkosc km/h
+        2 predkosc AVG km/h
+        3 predkosc MAX km/h
+        4 kadencja RPM
+        5 kadencja AVG RPM
+        B
+        1 zasięg km
+        2 dystans km
+        3 przebieg km
+        C
+        1 temperatura °C
+        2 sterownik °C
+        3 silnik °C
+        D
+        1 moc W
+        2 moc AVG W
+        3 moc MAX W
+        E
+        1 bateria V
+        2 natężenie A
+        3 energia Ah
+        4 energia Wh
+        5 pojemność %
+        F
+        1 Ciśnienie bar
+        2 Temperatura C
+        3 napięcie V
+        G
+        1 USB on/off
+        H
+        1 info
+        2 kasowanie liczników
+          - predkosc AVG km/h
+          - predkosc MAX km/h
+          - kadencja AVG RPM
+          - zasięg km
+          - dystans km
+          - moc AVG W
+          - moc MAX W 
+**************************************/
