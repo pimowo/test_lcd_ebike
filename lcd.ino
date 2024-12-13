@@ -1,12 +1,21 @@
 #include <Wire.h>
 #include <U8g2lib.h>
+#include <RTClib.h>
 
 // Definicje pinów
-#define I2C_SDA 8
-#define I2C_SCL 9
-#define BTN_UP 4
-#define BTN_DOWN 5
-#define BTN_SET 6
+#define I2C_SDA 21
+#define I2C_SCL 22
+
+#define BTN_UP 13
+#define BTN_DOWN 14
+#define BTN_SET 12
+
+#define FrontDayPin 2  // światła dzienne
+#define FrontPin 4     // światła zwykłe
+#define RealPin 15     // tylne światło
+
+// Dodaj obiekt RTC
+RTC_DS3231 rtc;
 
 // Inicjalizacja wyświetlacza
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
@@ -15,6 +24,12 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
 const unsigned long DEBOUNCE_DELAY = 50;
 const unsigned long BUTTON_DELAY = 200;
 const unsigned long LONG_PRESS_TIME = 1000;
+
+bool displayActive = false;
+const unsigned long GOODBYE_DELAY = 5000; // 5 sekund na komunikaty
+const unsigned long SET_LONG_PRESS = 3000; // 3 sekundy na długie naciśnięcie SET
+unsigned long messageStartTime = 0; // Używane zarówno dla powitania jak i pożegnania
+bool showingWelcome = false; // Flaga dla wyświetlania powitania
 
 // Typ wyświetlanego parametru
 enum DisplayMode {
@@ -52,8 +67,6 @@ float energyConsumption = 12.4; // Wh
 float batteryCapacity = 14.5;   // Ah
 int batteryPercent = 75;
 float batteryVoltage = 47.8;
-int hour = 12;
-int minute = 35;
 int lightMode = 0; // 0=brak, 1=Dzień, 2=Noc
 int assistMode = 0; // 0=PAS, 1=STOP, 2=GAZ, 3=P+G
 
@@ -66,17 +79,34 @@ void drawVerticalLine() {
 }
 
 void drawTopBar() {
+  static bool colonVisible = true;
+  static unsigned long lastColonToggle = 0;
+  const unsigned long COLON_TOGGLE_INTERVAL = 500; // Miganie co 500ms (pół sekundy)
+    
   display.setFont(u8g2_font_pxplusibmvga9_mf);
   
-  // Czas
+  // Pobierz aktualny czas z RTC
+  DateTime now = rtc.now();
+
+  // Czas z migającym dwukropkiem
   char timeStr[6];
-  sprintf(timeStr, "%02d:%02d", hour, minute);
+  if (colonVisible) {
+      sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
+  } else {
+      sprintf(timeStr, "%02d %02d", now.hour(), now.minute());
+  }
   display.drawStr(0, 13, timeStr);
   
+  // Przełącz stan dwukropka co COLON_TOGGLE_INTERVAL
+  if (millis() - lastColonToggle >= COLON_TOGGLE_INTERVAL) {
+      colonVisible = !colonVisible;
+      lastColonToggle = millis();
+  }
+
   // Bateria
   char battStr[5];
   sprintf(battStr, "%d%%", batteryPercent);
-  display.drawStr(65, 13, battStr);
+  display.drawStr(60, 13, battStr);
   
   // Napięcie
   char voltStr[6];
@@ -205,6 +235,84 @@ void drawMainDisplay() {
   display.drawStr(52, 62, descText);
 }
 
+// void handleButtons() {
+//     unsigned long currentTime = millis();
+    
+//     // Odczyt stanu przycisków
+//     bool upState = digitalRead(BTN_UP);
+//     bool downState = digitalRead(BTN_DOWN);
+//     bool setState = digitalRead(BTN_SET);
+    
+//     // Obsługa przycisku UP
+//     if (displayActive) {
+//         if (!upState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+//             if (!upPressStartTime) {
+//                 upPressStartTime = currentTime;
+//             } else if (!upLongPressExecuted && (currentTime - upPressStartTime) > LONG_PRESS_TIME) {
+//                 lightMode = (lightMode + 1) % 3;
+//                 upLongPressExecuted = true;
+//             }
+//         } else if (upState && upPressStartTime) {
+//             if (!upLongPressExecuted && (currentTime - upPressStartTime) < LONG_PRESS_TIME) {
+//                 if (assistLevel < 5) assistLevel++;
+//             }
+//             upPressStartTime = 0;
+//             upLongPressExecuted = false;
+//             lastDebounceTime = currentTime;
+//         }
+//     }
+    
+//     // Obsługa przycisku DOWN
+//     if (displayActive) {
+//         if (!downState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+//             if (!downPressStartTime) {
+//                 downPressStartTime = currentTime;
+//             } else if (!downLongPressExecuted && (currentTime - downPressStartTime) > LONG_PRESS_TIME) {
+//                 assistLevelAsText = !assistLevelAsText;
+//                 downLongPressExecuted = true;
+//             }
+//         } else if (downState && downPressStartTime) {
+//             if (!downLongPressExecuted && (currentTime - downPressStartTime) < LONG_PRESS_TIME) {
+//                 if (assistLevel > 0) assistLevel--;
+//             }
+//             downPressStartTime = 0;
+//             downLongPressExecuted = false;
+//             lastDebounceTime = currentTime;
+//         }
+//     }
+    
+//     // Obsługa przycisku SET
+//     if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+//         if (!setPressStartTime) {
+//             setPressStartTime = currentTime;
+//         } else if (displayActive && !setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
+//             // Długie naciśnięcie SET (3s) - wyświetl "Do widzenia :)" i wyłącz
+//             display.clearBuffer();
+//             display.setFont(u8g2_font_pxplusibmvga9_mf);
+//             display.drawStr(20, 32, "Do widzenia :)");
+//             display.sendBuffer();
+//             goodbyeStartTime = currentTime;
+//             setLongPressExecuted = true;
+//         }
+//     } else if (setState && setPressStartTime) {
+//         if (!setLongPressExecuted && (currentTime - setPressStartTime) < SET_LONG_PRESS && displayActive) {
+//             // Krótkie naciśnięcie SET - zmiana trybu wyświetlania
+//             currentDisplay = (DisplayMode)((currentDisplay + 1) % 7);
+//         }
+//         setPressStartTime = 0;
+//         setLongPressExecuted = false;
+//         lastDebounceTime = currentTime;
+//     }
+    
+//     // Sprawdź czy minął czas wyświetlania "Do widzenia"
+//     if (goodbyeStartTime > 0 && (currentTime - goodbyeStartTime) >= GOODBYE_DELAY) {
+//         display.clearBuffer();
+//         display.sendBuffer();
+//         displayActive = false;
+//         goodbyeStartTime = 0;
+//     }
+// }
+
 void handleButtons() {
     unsigned long currentTime = millis();
     
@@ -213,62 +321,122 @@ void handleButtons() {
     bool downState = digitalRead(BTN_DOWN);
     bool setState = digitalRead(BTN_SET);
     
-    // Obsługa przycisku UP
-    if (!upState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
-        if (!upPressStartTime) {
-            upPressStartTime = currentTime;
-        } else if (!upLongPressExecuted && (currentTime - upPressStartTime) > LONG_PRESS_TIME) {
-            // Długie naciśnięcie UP - przełączanie trybu wyświetlania assist level
-            assistLevelAsText = !assistLevelAsText;
-            upLongPressExecuted = true;
+    // Obsługa przycisku SET dla wyłączonego wyświetlacza
+    if (!displayActive) {
+        if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+            if (!setPressStartTime) {
+                setPressStartTime = currentTime;
+            } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
+                // Włączanie wyświetlacza
+                display.clearBuffer();
+                display.setFont(u8g2_font_pxplusibmvga9_mf);
+                display.drawStr(40, 32, "Witaj!");
+                display.sendBuffer();
+                messageStartTime = currentTime;
+                setLongPressExecuted = true;
+                showingWelcome = true;
+                displayActive = true;
+            }
+        } else if (setState && setPressStartTime) {
+            setPressStartTime = 0;
+            setLongPressExecuted = false;
+            lastDebounceTime = currentTime;
         }
-    } else if (upState && upPressStartTime) {
-        if (!upLongPressExecuted && (currentTime - upPressStartTime) < LONG_PRESS_TIME) {
-            // Krótkie naciśnięcie UP - zwiększenie poziomu wspomagania
-            if (assistLevel < 5) assistLevel++;
-        }
-        upPressStartTime = 0;
-        upLongPressExecuted = false;
-        lastDebounceTime = currentTime;
+        return; // Wyjdź z funkcji jeśli wyświetlacz jest wyłączony
     }
     
-    // Obsługa przycisku DOWN
-    if (!downState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
-        if (!downPressStartTime) {
-            downPressStartTime = currentTime;
-        } else if (!downLongPressExecuted && (currentTime - downPressStartTime) > LONG_PRESS_TIME) {
-            // Długie naciśnięcie DOWN - zmiana trybu oświetlenia
-            lightMode = (lightMode + 1) % 3;  // 0=brak, 1=Dzień, 2=Noc
-            downLongPressExecuted = true;
+    // Reszta obsługi przycisków gdy wyświetlacz jest włączony
+    if (!showingWelcome) { // Nie obsługuj innych przycisków podczas powitania
+        // Obsługa przycisku UP
+        if (!upState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+            if (!upPressStartTime) {
+                upPressStartTime = currentTime;
+            } else if (!upLongPressExecuted && (currentTime - upPressStartTime) > LONG_PRESS_TIME) {
+                lightMode = (lightMode + 1) % 3;
+                upLongPressExecuted = true;
+            }
+        } else if (upState && upPressStartTime) {
+            if (!upLongPressExecuted && (currentTime - upPressStartTime) < LONG_PRESS_TIME) {
+                if (assistLevel < 5) assistLevel++;
+            }
+            upPressStartTime = 0;
+            upLongPressExecuted = false;
+            lastDebounceTime = currentTime;
         }
-    } else if (downState && downPressStartTime) {
-        if (!downLongPressExecuted && (currentTime - downPressStartTime) < LONG_PRESS_TIME) {
-            // Krótkie naciśnięcie DOWN - zmniejszenie poziomu wspomagania
-            if (assistLevel > 0) assistLevel--;
+        
+        // Obsługa przycisku DOWN
+        if (!downState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+            if (!downPressStartTime) {
+                downPressStartTime = currentTime;
+            } else if (!downLongPressExecuted && (currentTime - downPressStartTime) > LONG_PRESS_TIME) {
+                assistLevelAsText = !assistLevelAsText;
+                downLongPressExecuted = true;
+            }
+        } else if (downState && downPressStartTime) {
+            if (!downLongPressExecuted && (currentTime - downPressStartTime) < LONG_PRESS_TIME) {
+                if (assistLevel > 0) assistLevel--;
+            }
+            downPressStartTime = 0;
+            downLongPressExecuted = false;
+            lastDebounceTime = currentTime;
         }
-        downPressStartTime = 0;
-        downLongPressExecuted = false;
-        lastDebounceTime = currentTime;
+        
+        // Obsługa przycisku SET (dla włączonego wyświetlacza)
+        if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+            if (!setPressStartTime) {
+                setPressStartTime = currentTime;
+            } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
+                // Wyłączanie wyświetlacza
+                display.clearBuffer();
+                display.setFont(u8g2_font_pxplusibmvga9_mf);
+                display.drawStr(20, 32, "Do widzenia :)");
+                display.sendBuffer();
+                messageStartTime = currentTime;
+                setLongPressExecuted = true;
+                showingWelcome = false;
+            }
+        } else if (setState && setPressStartTime) {
+            if (!setLongPressExecuted && (currentTime - setPressStartTime) < SET_LONG_PRESS) {
+                currentDisplay = (DisplayMode)((currentDisplay + 1) % 7);
+            }
+            setPressStartTime = 0;
+            setLongPressExecuted = false;
+            lastDebounceTime = currentTime;
+        }
     }
     
-    // Obsługa przycisku SET
-    if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
-        if (!setPressStartTime) {
-            setPressStartTime = currentTime;
+    // Sprawdzanie czasu wyświetlania komunikatów
+    if (messageStartTime > 0 && (currentTime - messageStartTime) >= GOODBYE_DELAY) {
+        if (!showingWelcome) {
+            // Koniec wyświetlania "Do widzenia"
+            display.clearBuffer();
+            display.sendBuffer();
+            displayActive = false;
         }
-    } else if (setState && setPressStartTime) {
-        if ((currentTime - setPressStartTime) < LONG_PRESS_TIME) {
-            // Krótkie naciśnięcie SET - zmiana trybu wyświetlania
-            currentDisplay = (DisplayMode)((currentDisplay + 1) % 7);
-        }
-        setPressStartTime = 0;
-        lastDebounceTime = currentTime;
+        // Koniec wyświetlania "Witaj" lub "Do widzenia"
+        messageStartTime = 0;
+        showingWelcome = false;
     }
 }
 
 void setup() {
     Serial.begin(115200);
     
+    // Inicjalizacja RTC
+    if (!rtc.begin()) {
+        Serial.println("Couldn't find RTC");
+        while (1);
+    }
+
+    // Jeśli chcesz ustawić czas, odkomentuj poniższą linię
+    // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    
+    // Jeśli RTC stracił zasilanie, ustaw go
+    if (rtc.lostPower()) {
+        Serial.println("RTC lost power, lets set the time!");
+        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    }
+
     // Konfiguracja pinów
     pinMode(BTN_UP, INPUT_PULLUP);
     pinMode(BTN_DOWN, INPUT_PULLUP);
@@ -279,98 +447,74 @@ void setup() {
     display.begin();
     display.enableUTF8Print();
     display.setFontDirection(0);
+
+    // Wyczyść wyświetlacz na starcie
+    display.clearBuffer();
+    display.sendBuffer();
 }
+
+// void loop() {
+//     static unsigned long lastButtonCheck = 0;
+//     static unsigned long lastUpdate = 0;
+//     const unsigned long buttonInterval = 10;
+//     const unsigned long updateInterval = 2000;
+
+//     unsigned long currentTime = millis();
+
+//     if (currentTime - lastButtonCheck >= buttonInterval) {
+//         handleButtons();
+//         lastButtonCheck = currentTime;
+//     }
+
+//     // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla "Do widzenia"
+//     if (displayActive && goodbyeStartTime == 0) {
+//         display.clearBuffer();
+//         drawTopBar();
+//         drawHorizontalLine();
+//         drawVerticalLine();
+//         drawAssistLevel();
+//         drawMainDisplay();
+//         drawLightStatus();
+//         display.sendBuffer();
+
+//         if (currentTime - lastUpdate >= updateInterval) {  
 
 void loop() {
     static unsigned long lastButtonCheck = 0;
     static unsigned long lastUpdate = 0;
-    const unsigned long buttonInterval = 10; // Interwał sprawdzania przycisków (10 ms)
-    const unsigned long updateInterval = 2000; // Interwał aktualizacji danych (2000 ms)
+    const unsigned long buttonInterval = 10;
+    const unsigned long updateInterval = 2000;
 
     unsigned long currentTime = millis();
 
-    // Obsługa przycisków
     if (currentTime - lastButtonCheck >= buttonInterval) {
         handleButtons();
         lastButtonCheck = currentTime;
     }
 
-    // Rysowanie interfejsu
-    display.clearBuffer();
-    drawTopBar();
-    drawHorizontalLine();
-    drawVerticalLine();
-    drawAssistLevel();
-    drawMainDisplay();
-    drawLightStatus();
-    display.sendBuffer();
+    // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla komunikatów
+    if (displayActive && messageStartTime == 0) {
+        display.clearBuffer();
+        drawTopBar();
+        drawHorizontalLine();
+        drawVerticalLine();
+        drawAssistLevel();
+        drawMainDisplay();
+        drawLightStatus();
+        display.sendBuffer();
 
-    // Symulacja zmiany danych
-    if (currentTime - lastUpdate >= updateInterval) {
-        speed = (speed >= 35.0) ? 0.0 : speed + 0.1;
-        tripDistance += 0.1;
-        totalDistance += 0.1;
-        temperature = 20.0 + random(100) / 10.0;
-        power = 100 + random(300);
-        energyConsumption += 0.2;
-        batteryCapacity = 14.5 - (random(20) / 10.0);
-
-        minute = (minute >= 59) ? 0 : minute + 1;
-        hour = (minute == 0) ? (hour >= 23 ? 0 : hour + 1) : hour;
-        batteryPercent = (batteryPercent <= 0) ? 100 : batteryPercent - 1;
-        batteryVoltage = (batteryVoltage <= 42.0) ? 50.0 : batteryVoltage - 0.1;
-        assistMode = (assistMode + 1) % 4;
-        lastUpdate = currentTime;
+        if (currentTime - lastUpdate >= updateInterval) {  
+            speed = (speed >= 35.0) ? 0.0 : speed + 0.1;
+            tripDistance += 0.1;
+            totalDistance += 0.1;
+            temperature = 20.0 + random(100) / 10.0;
+            power = 100 + random(300);
+            energyConsumption += 0.2;
+            batteryCapacity = 14.5 - (random(20) / 10.0);
+            batteryPercent = (batteryPercent <= 0) ? 100 : batteryPercent - 1;
+            batteryVoltage = (batteryVoltage <= 42.0) ? 50.0 : batteryVoltage - 0.1;
+            assistMode = (assistMode + 1) % 4;
+            lastUpdate = currentTime;
+        }
     }
 }
-
-/**************************************
-        przełaczanie ekranów A-I przez krótkie naciśnięcia < 1s
-        wejście do ekranu A-I przez długie naciśnięcie <= 1s
-        przełaczanie ekranów 1-x przez krótkie naciśnięcia < 1s
-        wyjscie do ekranu A-I przez długie naciśnięcie >= 1s
-        przełączenie USB przez krótkie naciśnięcie dwóch przycisków UP i DOWN
-        kasowanie liczników przez krótkie naciśnięcie dwóch przycisków UP i DOWN
-            
-        A 
-        1 predkosc km/h
-        2 predkosc AVG km/h
-        3 predkosc MAX km/h
-        B
-        1 kadencja RPM
-        2 kadencja AVG RPM
-        C
-        1 zasięg km
-        2 dystans km
-        3 przebieg km
-        D
-        1 temperatura °C
-        2 sterownik °C
-        3 silnik °C
-        E
-        1 moc W
-        2 moc AVG W
-        3 moc MAX W
-        F
-        1 bateria V
-        2 natężenie A
-        3 energia Ah
-        4 energia Wh
-        5 pojemność %
-        G
-        1 Ciśnienie bar
-        2 Temperatura C
-        3 napięcie V
-        H
-        1 USB on/off
-        I
-        1 info
-        2 kasowanie liczników
-          - predkosc AVG km/h
-          - predkosc MAX km/h
-          - kadencja AVG RPM
-          - zasięg km
-          - dystans km
-          - moc AVG W
-          - moc MAX W 
-**************************************/
