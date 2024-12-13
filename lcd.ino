@@ -235,84 +235,6 @@ void drawMainDisplay() {
   display.drawStr(52, 62, descText);
 }
 
-// void handleButtons() {
-//     unsigned long currentTime = millis();
-    
-//     // Odczyt stanu przycisków
-//     bool upState = digitalRead(BTN_UP);
-//     bool downState = digitalRead(BTN_DOWN);
-//     bool setState = digitalRead(BTN_SET);
-    
-//     // Obsługa przycisku UP
-//     if (displayActive) {
-//         if (!upState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
-//             if (!upPressStartTime) {
-//                 upPressStartTime = currentTime;
-//             } else if (!upLongPressExecuted && (currentTime - upPressStartTime) > LONG_PRESS_TIME) {
-//                 lightMode = (lightMode + 1) % 3;
-//                 upLongPressExecuted = true;
-//             }
-//         } else if (upState && upPressStartTime) {
-//             if (!upLongPressExecuted && (currentTime - upPressStartTime) < LONG_PRESS_TIME) {
-//                 if (assistLevel < 5) assistLevel++;
-//             }
-//             upPressStartTime = 0;
-//             upLongPressExecuted = false;
-//             lastDebounceTime = currentTime;
-//         }
-//     }
-    
-//     // Obsługa przycisku DOWN
-//     if (displayActive) {
-//         if (!downState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
-//             if (!downPressStartTime) {
-//                 downPressStartTime = currentTime;
-//             } else if (!downLongPressExecuted && (currentTime - downPressStartTime) > LONG_PRESS_TIME) {
-//                 assistLevelAsText = !assistLevelAsText;
-//                 downLongPressExecuted = true;
-//             }
-//         } else if (downState && downPressStartTime) {
-//             if (!downLongPressExecuted && (currentTime - downPressStartTime) < LONG_PRESS_TIME) {
-//                 if (assistLevel > 0) assistLevel--;
-//             }
-//             downPressStartTime = 0;
-//             downLongPressExecuted = false;
-//             lastDebounceTime = currentTime;
-//         }
-//     }
-    
-//     // Obsługa przycisku SET
-//     if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
-//         if (!setPressStartTime) {
-//             setPressStartTime = currentTime;
-//         } else if (displayActive && !setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
-//             // Długie naciśnięcie SET (3s) - wyświetl "Do widzenia :)" i wyłącz
-//             display.clearBuffer();
-//             display.setFont(u8g2_font_pxplusibmvga9_mf);
-//             display.drawStr(20, 32, "Do widzenia :)");
-//             display.sendBuffer();
-//             goodbyeStartTime = currentTime;
-//             setLongPressExecuted = true;
-//         }
-//     } else if (setState && setPressStartTime) {
-//         if (!setLongPressExecuted && (currentTime - setPressStartTime) < SET_LONG_PRESS && displayActive) {
-//             // Krótkie naciśnięcie SET - zmiana trybu wyświetlania
-//             currentDisplay = (DisplayMode)((currentDisplay + 1) % 7);
-//         }
-//         setPressStartTime = 0;
-//         setLongPressExecuted = false;
-//         lastDebounceTime = currentTime;
-//     }
-    
-//     // Sprawdź czy minął czas wyświetlania "Do widzenia"
-//     if (goodbyeStartTime > 0 && (currentTime - goodbyeStartTime) >= GOODBYE_DELAY) {
-//         display.clearBuffer();
-//         display.sendBuffer();
-//         displayActive = false;
-//         goodbyeStartTime = 0;
-//     }
-// }
-
 void handleButtons() {
     unsigned long currentTime = millis();
     
@@ -408,18 +330,37 @@ void handleButtons() {
     // Sprawdzanie czasu wyświetlania komunikatów
     if (messageStartTime > 0 && (currentTime - messageStartTime) >= GOODBYE_DELAY) {
         if (!showingWelcome) {
-            // Koniec wyświetlania "Do widzenia"
-            display.clearBuffer();
-            display.sendBuffer();
-            displayActive = false;
+            // Koniec wyświetlania "Do widzenia" - przejdź do deep sleep
+            goToSleep();  // To wywoła funkcję deep sleep zamiast tylko wyłączać wyświetlacz
         }
-        // Koniec wyświetlania "Witaj" lub "Do widzenia"
+        // Koniec wyświetlania "Witaj"
         messageStartTime = 0;
         showingWelcome = false;
     }
 }
 
+void goToSleep() {
+    // Wyłącz wszystkie LEDy
+    digitalWrite(FrontDayPin, LOW);
+    digitalWrite(FrontPin, LOW);
+    digitalWrite(RealPin, LOW);
+    
+    // Wyłącz OLED
+    display.clearBuffer();
+    display.sendBuffer();
+    display.setPowerSave(1);  // Wprowadź OLED w tryb oszczędzania energii
+    
+    // Konfiguracja wybudzania przez przycisk SET
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_12, 0);  // GPIO12 (BTN_SET) stan niski
+    
+    // Wejście w deep sleep
+    esp_deep_sleep_start();
+}
+
 void setup() {
+    // Sprawdź przyczynę wybudzenia
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    
     Serial.begin(115200);
     
     // Inicjalizacja RTC
@@ -441,6 +382,14 @@ void setup() {
     pinMode(BTN_UP, INPUT_PULLUP);
     pinMode(BTN_DOWN, INPUT_PULLUP);
     pinMode(BTN_SET, INPUT_PULLUP);
+
+    // Konfiguracja pinów LED
+    pinMode(FrontDayPin, OUTPUT);
+    pinMode(FrontPin, OUTPUT);
+    pinMode(RealPin, OUTPUT);
+    digitalWrite(FrontDayPin, LOW);
+    digitalWrite(FrontPin, LOW);
+    digitalWrite(RealPin, LOW);
     
     // Inicjalizacja I2C i wyświetlacza
     Wire.begin(I2C_SDA, I2C_SCL);
@@ -451,33 +400,30 @@ void setup() {
     // Wyczyść wyświetlacz na starcie
     display.clearBuffer();
     display.sendBuffer();
+
+    // Jeśli wybudzenie przez przycisk SET, poczekaj na długie naciśnięcie
+    if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+        unsigned long startTime = millis();
+        while(!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
+            if((millis() - startTime) > SET_LONG_PRESS) {
+                displayActive = true;
+                showingWelcome = true;
+                messageStartTime = millis();
+                
+                display.clearBuffer();
+                display.setFont(u8g2_font_pxplusibmvga9_mf);
+                display.drawStr(40, 32, "Witaj!");
+                display.sendBuffer();
+                
+                while(!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
+                    delay(10);
+                }
+                break;
+            }
+            delay(10);
+        }
+    }
 }
-
-// void loop() {
-//     static unsigned long lastButtonCheck = 0;
-//     static unsigned long lastUpdate = 0;
-//     const unsigned long buttonInterval = 10;
-//     const unsigned long updateInterval = 2000;
-
-//     unsigned long currentTime = millis();
-
-//     if (currentTime - lastButtonCheck >= buttonInterval) {
-//         handleButtons();
-//         lastButtonCheck = currentTime;
-//     }
-
-//     // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla "Do widzenia"
-//     if (displayActive && goodbyeStartTime == 0) {
-//         display.clearBuffer();
-//         drawTopBar();
-//         drawHorizontalLine();
-//         drawVerticalLine();
-//         drawAssistLevel();
-//         drawMainDisplay();
-//         drawLightStatus();
-//         display.sendBuffer();
-
-//         if (currentTime - lastUpdate >= updateInterval) {  
 
 void loop() {
     static unsigned long lastButtonCheck = 0;
