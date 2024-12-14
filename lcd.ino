@@ -1,6 +1,8 @@
 #include <Wire.h>
 #include <U8g2lib.h>
 #include <RTClib.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 // Definicje pinów
 #define I2C_SDA 21
@@ -13,6 +15,14 @@
 #define FrontDayPin 2  // światła dzienne
 #define FrontPin 4     // światła zwykłe
 #define RealPin 15     // tylne światło
+
+#define PIN_ONE_WIRE_BUS 3  // Pin do którego podłączony jest DS18B20
+
+OneWire oneWire(PIN_ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+unsigned long ds18b20RequestTime = 0;
+const unsigned long DS18B20_CONVERSION_DELAY_MS = 750;
+float currentTemp = 0.0;
 
 // Dodaj obiekt RTC
 RTC_DS3231 rtc;
@@ -76,6 +86,33 @@ void drawHorizontalLine() {
 
 void drawVerticalLine() {
   display.drawVLine(45, 22, 48);
+}
+
+// Funkcja sprawdzająca, czy odczyt DS18B20 jest gotowy
+bool isGroundTemperatureReady() {
+    return millis() - ds18b20RequestTime >= DS18B20_CONVERSION_DELAY_MS;
+}
+
+// Funkcja sprawdzająca, czy odczytana temperatura jest poprawna
+bool isValidTemperature(float temp) {
+    return (temp >= -50.0 && temp <= 100.0);
+}
+
+// Funkcja inicjująca pomiar temperatury
+void requestGroundTemperature() {
+    sensors.requestTemperatures();
+    ds18b20RequestTime = millis();
+}
+
+// Funkcja odczytująca temperaturę
+float readGroundTemperature() {
+    if (isGroundTemperatureReady()) {
+        float temperature = sensors.getTempCByIndex(0);
+        if (isValidTemperature(temperature)) {
+            return temperature;
+        }
+    }
+    return -999.0; // Kod błędu
 }
 
 void drawTopBar() {
@@ -362,6 +399,10 @@ void setup() {
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
     
     Serial.begin(115200);
+
+    // Inicjalizacja DS18B20
+    sensors.begin();
+    requestGroundTemperature(); // Pierwsze żądanie pomiaru
     
     // Inicjalizacja RTC
     if (!rtc.begin()) {
@@ -430,6 +471,7 @@ void loop() {
     static unsigned long lastUpdate = 0;
     const unsigned long buttonInterval = 10;
     const unsigned long updateInterval = 2000;
+    static unsigned long lastTempUpdate = 0;
 
     unsigned long currentTime = millis();
 
@@ -449,11 +491,20 @@ void loop() {
         drawLightStatus();
         display.sendBuffer();
 
+        // Aktualizacja temperatury co 1 sekundę
+        if (currentMillis - lastTempUpdate >= 1000) {
+            if (isGroundTemperatureReady()) {
+                currentTemp = readGroundTemperature();
+                requestGroundTemperature(); // Rozpocznij kolejny pomiar
+                lastTempUpdate = currentMillis;
+            }
+        }
+
         if (currentTime - lastUpdate >= updateInterval) {  
             speed = (speed >= 35.0) ? 0.0 : speed + 0.1;
             tripDistance += 0.1;
             totalDistance += 0.1;
-            temperature = 20.0 + random(100) / 10.0;
+            //temperature = 20.0 + random(100) / 10.0;
             power = 100 + random(300);
             energyConsumption += 0.2;
             batteryCapacity = 14.5 - (random(20) / 10.0);
