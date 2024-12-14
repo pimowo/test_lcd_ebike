@@ -12,11 +12,11 @@
 #define BTN_DOWN 14
 #define BTN_SET 12
 
-#define FrontDayPin 2  // światła dzienne
-#define FrontPin 4     // światła zwykłe
-#define RealPin 15     // tylne światło
+#define FrontDayPin 5  // światła dzienne
+#define FrontPin 18     // światła zwykłe
+#define RealPin 19     // tylne światło
 
-#define PIN_ONE_WIRE_BUS 3  // Pin do którego podłączony jest DS18B20
+#define PIN_ONE_WIRE_BUS 15  // Pin do którego podłączony jest DS18B20
 
 OneWire oneWire(PIN_ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -31,7 +31,7 @@ RTC_DS3231 rtc;
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
 
 // Stałe czasowe dla przycisków
-const unsigned long DEBOUNCE_DELAY = 50;
+const unsigned long DEBOUNCE_DELAY = 25;
 const unsigned long BUTTON_DELAY = 200;
 const unsigned long LONG_PRESS_TIME = 1000;
 
@@ -40,6 +40,11 @@ const unsigned long GOODBYE_DELAY = 5000; // 5 sekund na komunikaty
 const unsigned long SET_LONG_PRESS = 3000; // 3 sekundy na długie naciśnięcie SET
 unsigned long messageStartTime = 0; // Używane zarówno dla powitania jak i pożegnania
 bool showingWelcome = false; // Flaga dla wyświetlania powitania
+
+// Dodaj na początku pliku z innymi zmiennymi globalnymi
+bool temperatureReady = false;
+unsigned long lastTempRequest = 0;
+const unsigned long TEMP_REQUEST_INTERVAL = 1000; // 1 sekunda między pomiarami
 
 // Typ wyświetlanego parametru
 enum DisplayMode {
@@ -79,6 +84,99 @@ int batteryPercent = 75;
 float batteryVoltage = 47.8;
 int lightMode = 0; // 0=brak, 1=Dzień, 2=Noc
 int assistMode = 0; // 0=PAS, 1=STOP, 2=GAZ, 3=P+G
+
+class TimeoutHandler {
+private:
+    uint32_t startTime;
+    uint32_t timeoutPeriod;
+    bool isRunning;
+
+public:
+    TimeoutHandler(uint32_t timeout_ms = 0) : 
+        startTime(0), 
+        timeoutPeriod(timeout_ms), 
+        isRunning(false) {}
+
+    void start(uint32_t timeout_ms = 0) {
+        if (timeout_ms > 0) timeoutPeriod = timeout_ms;
+        startTime = millis();
+        isRunning = true;
+    }
+
+    bool isExpired() {
+        if (!isRunning) return false;
+        return (millis() - startTime) >= timeoutPeriod;
+    }
+
+    void stop() {
+        isRunning = false;
+    }
+
+    uint32_t getElapsed() {
+        if (!isRunning) return 0;
+        return (millis() - startTime);
+    }
+};
+
+class TemperatureSensor {
+private:
+    TimeoutHandler conversionTimeout;
+    TimeoutHandler readTimeout;
+    bool conversionInProgress;
+
+public:
+    TemperatureSensor() : 
+        conversionTimeout(DS18B20_CONVERSION_DELAY_MS),
+        readTimeout(1000),  // 1 sekunda na odczyt
+        conversionInProgress(false) {}
+
+    void requestTemperature() {
+        if (conversionInProgress) return;
+        
+        sensors.requestTemperatures();
+        conversionTimeout.start();
+        conversionInProgress = true;
+    }
+
+    bool isReady() {
+        if (!conversionInProgress) return false;
+        if (conversionTimeout.isExpired()) {
+            conversionInProgress = false;
+            return true;
+        }
+        return false;
+    }
+
+    float readTemperature() {
+        if (!conversionInProgress) return -999.0;
+
+        readTimeout.start();
+        float temp = sensors.getTempCByIndex(0);
+
+        if (readTimeout.isExpired()) {
+            return -999.0;
+        }
+
+        conversionInProgress = false;
+        return isValidTemperature(temp) ? temp : -999.0;
+    }
+};
+
+TemperatureSensor tempSensor;
+
+void temperatureTask(void * parameter) {
+    for(;;) {
+        if (!tempSensor.isReady()) {
+            tempSensor.requestTemperature();
+        } else {
+            float temp = tempSensor.readTemperature();
+            if (temp != -999.0) {
+                currentTemp = temp;
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Odczyt co 1 sekundę
+    }
+}
 
 void drawHorizontalLine() {
   display.drawHLine(4, 17, 122);
@@ -214,7 +312,7 @@ void drawMainDisplay() {
       unitStr = "km";
       break;
     case TEMP:
-      sprintf(valueStr, "%4.1f", temperature);
+      sprintf(valueStr, "%4.1f", currentTemp != -999.0 ? currentTemp : 0.0);
       unitStr = "°C";
       break;
     case POWER:
@@ -404,6 +502,17 @@ void setup() {
     sensors.begin();
     requestGroundTemperature(); // Pierwsze żądanie pomiaru
     
+    // Uruchom task temperatury na rdzeniu 0
+    xTaskCreatePinnedToCore(
+        temperatureTask,    // Funkcja zadania
+        "TempTask",        // Nazwa
+        2048,              // Rozmiar stosu
+        NULL,              // Parametry
+        1,                 // Priorytet
+        NULL,             // Uchwyt do zadania
+        0                  // Rdzeń (0)
+    )
+
     // Inicjalizacja RTC
     if (!rtc.begin()) {
         Serial.println("Couldn't find RTC");
@@ -411,7 +520,11 @@ void setup() {
     }
 
     // Jeśli chcesz ustawić czas, odkomentuj poniższą linię
-    // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+
+    // Ustaw aktualny czas (rok, miesiąc, dzień, godzina, minuta, sekunda)
+    //rtc.adjust(DateTime(2024, 12, 14, 13, 31, 0)); // Pamiętaj o strefie czasowej (UTC+1)
+
     
     // Jeśli RTC stracił zasilanie, ustaw go
     if (rtc.lostPower()) {
@@ -469,7 +582,7 @@ void setup() {
 void loop() {
     static unsigned long lastButtonCheck = 0;
     static unsigned long lastUpdate = 0;
-    const unsigned long buttonInterval = 10;
+    const unsigned long buttonInterval = 5;
     const unsigned long updateInterval = 2000;
     static unsigned long lastTempUpdate = 0;
 
@@ -491,20 +604,10 @@ void loop() {
         drawLightStatus();
         display.sendBuffer();
 
-        // Aktualizacja temperatury co 1 sekundę
-        if (currentMillis - lastTempUpdate >= 1000) {
-            if (isGroundTemperatureReady()) {
-                currentTemp = readGroundTemperature();
-                requestGroundTemperature(); // Rozpocznij kolejny pomiar
-                lastTempUpdate = currentMillis;
-            }
-        }
-
         if (currentTime - lastUpdate >= updateInterval) {  
             speed = (speed >= 35.0) ? 0.0 : speed + 0.1;
             tripDistance += 0.1;
             totalDistance += 0.1;
-            //temperature = 20.0 + random(100) / 10.0;
             power = 100 + random(300);
             energyConsumption += 0.2;
             batteryCapacity = 14.5 - (random(20) / 10.0);
