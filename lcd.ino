@@ -190,28 +190,6 @@ void drawVerticalLine() {
   display.drawVLine(45, 22, 48);
 }
 
-// Funkcja sprawdzająca, czy odczyt DS18B20 jest gotowy
-bool isGroundTemperatureReady() {
-    return millis() - ds18b20RequestTime >= DS18B20_CONVERSION_DELAY_MS;
-}
-
-// Funkcja inicjująca pomiar temperatury
-void requestGroundTemperature() {
-    sensors.requestTemperatures();
-    ds18b20RequestTime = millis();
-}
-
-// Funkcja odczytująca temperaturę
-float readGroundTemperature() {
-    if (isGroundTemperatureReady()) {
-        float temperature = sensors.getTempCByIndex(0);
-        if (isValidTemperature(temperature)) {
-            return temperature;
-        }
-    }
-    return -999.0; // Kod błędu
-}
-
 void drawTopBar() {
   static bool colonVisible = true;
   static unsigned long lastColonToggle = 0;
@@ -311,9 +289,13 @@ void drawMainDisplay() {
       unitStr = "km";
       break;
     case TEMP:
-      sprintf(valueStr, "%4.1f", currentTemp != -999.0 ? currentTemp : 0.0);
-      unitStr = "°C";
-      break;
+        if (currentTemp != -999.0) {
+            sprintf(valueStr, "%4.1f", currentTemp);
+        } else {
+            strcpy(valueStr, "Blad");  // Pokazuj kreski jeśli błąd odczytu
+        }
+        unitStr = "°C";
+        break;
     case POWER:
       sprintf(valueStr, "%4d", power);
       unitStr = "W";
@@ -502,7 +484,17 @@ void setup() {
 
     // Inicjalizacja DS18B20
     sensors.begin();
-    requestGroundTemperature(); // Pierwsze żądanie pomiaru
+    Serial.println("Inicjalizacja DS18B20...");
+    Serial.print("Znaleziono czujników: ");
+    Serial.println(sensors.getDeviceCount());
+    
+    if (sensors.getDeviceCount() == 0) {
+        Serial.println("Nie znaleziono czujnika DS18B20!");
+    }
+    
+    sensors.setResolution(12);  // Ustaw najwyższą rozdzielczość
+    tempSensor.requestTemperature();  // Pierwsze żądanie pomiaru
+    
     
     // Uruchom task temperatury na rdzeniu 0
     xTaskCreatePinnedToCore(
@@ -599,6 +591,18 @@ void loop() {
         lastButtonCheck = currentTime;
     }
 
+    // Obsługa czujnika temperatury
+    if (!tempSensor.isReady()) {
+        tempSensor.requestTemperature();
+    } else {
+        float temp = tempSensor.readTemperature();
+        if (temp != -999.0) {
+            currentTemp = temp;
+            Serial.print("Temperatura: ");
+            Serial.println(currentTemp);
+        }
+    }
+
     // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla komunikatów
     if (displayActive && messageStartTime == 0) {
         display.clearBuffer();
@@ -609,13 +613,6 @@ void loop() {
         drawMainDisplay();
         drawLightStatus();
         display.sendBuffer();
-
-        // Obsługa czujnika temperatury
-        if (!tempSensor.isReady()) {
-            tempSensor.requestTemperature();
-        } else {
-            currentTemp = tempSensor.readTemperature();
-        }
 
         if (currentTime - lastUpdate >= updateInterval) {  
             speed = (speed >= 35.0) ? 0.0 : speed + 0.1;
