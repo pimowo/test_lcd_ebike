@@ -196,11 +196,6 @@ bool isGroundTemperatureReady() {
     return millis() - ds18b20RequestTime >= DS18B20_CONVERSION_DELAY_MS;
 }
 
-// Funkcja sprawdzająca, czy odczytana temperatura jest poprawna
-bool isValidTemperature(float temp) {
-    return (temp >= -50.0 && temp <= 100.0);
-}
-
 // Funkcja inicjująca pomiar temperatury
 void requestGroundTemperature() {
     sensors.requestTemperatures();
@@ -546,13 +541,13 @@ void setup() {
     pinMode(FrontDayPin, OUTPUT);
     pinMode(FrontPin, OUTPUT);
     pinMode(RealPin, OUTPUT);
-    digitalWrite(FrontDayPin, HIGH);
-    digitalWrite(FrontPin, HIGH);
-    digitalWrite(RealPin, HIGH);
+    digitalWrite(FrontDayPin, LOW);
+    digitalWrite(FrontPin, LOW);
+    digitalWrite(RealPin, LOW);
 
     // ladowarka usb
     pinMode(UsbPin, OUTPUT);
-    digitalWrite(UsbPin, HIGH);
+    digitalWrite(UsbPin, LOW);
     
     // Inicjalizacja I2C i wyświetlacza
     Wire.begin(I2C_SDA, I2C_SCL);
