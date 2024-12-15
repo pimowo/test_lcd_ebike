@@ -13,8 +13,9 @@
 #define BTN_SET 12
 
 #define FrontDayPin 5  // światła dzienne
-#define FrontPin 18     // światła zwykłe
+#define FrontPin 18    // światła zwykłe
 #define RealPin 19     // tylne światło
+#define UsbPin 32      // ładowarka USB
 
 #define PIN_ONE_WIRE_BUS 15  // Pin do którego podłączony jest DS18B20
 
@@ -541,9 +542,13 @@ void setup() {
     pinMode(FrontDayPin, OUTPUT);
     pinMode(FrontPin, OUTPUT);
     pinMode(RealPin, OUTPUT);
-    digitalWrite(FrontDayPin, LOW);
-    digitalWrite(FrontPin, LOW);
-    digitalWrite(RealPin, LOW);
+    digitalWrite(FrontDayPin, HIGH);
+    digitalWrite(FrontPin, HIGH);
+    digitalWrite(RealPin, HIGH);
+
+    // ladowarka usb
+    pinMode(UsbPin, OUTPUT);
+    digitalWrite(UsbPin, HIGH);
     
     // Inicjalizacja I2C i wyświetlacza
     Wire.begin(I2C_SDA, I2C_SCL);
@@ -603,6 +608,13 @@ void loop() {
         drawMainDisplay();
         drawLightStatus();
         display.sendBuffer();
+
+        // Obsługa czujnika temperatury
+        if (!tempSensor.isReady()) {
+            tempSensor.requestTemperature();
+        } else {
+            currentTemp = tempSensor.readTemperature();
+        }
 
         if (currentTime - lastUpdate >= updateInterval) {  
             speed = (speed >= 35.0) ? 0.0 : speed + 0.1;
