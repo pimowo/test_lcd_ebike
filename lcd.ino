@@ -5,18 +5,17 @@
 #include <DallasTemperature.h>
 
 // Definicje pinów
-#define I2C_SDA 21
-#define I2C_SCL 22
-
+// Przyciski
 #define BTN_UP 13
 #define BTN_DOWN 14
 #define BTN_SET 12
-
+// Światła
 #define FrontDayPin 5  // światła dzienne
 #define FrontPin 18    // światła zwykłe
 #define RealPin 19     // tylne światło
+// Ładowarka USB
 #define UsbPin 32      // ładowarka USB
-
+// Czujnik temperatury powietrza
 #define PIN_ONE_WIRE_BUS 15  // Pin do którego podłączony jest DS18B20
 
 OneWire oneWire(PIN_ONE_WIRE_BUS);
@@ -481,6 +480,8 @@ void goToSleep() {
     digitalWrite(RealPin, LOW);
     digitalWrite(UsbPin, LOW);
     
+    delay(50);
+
     // Wyłącz OLED
     display.clearBuffer();
     display.sendBuffer();
@@ -551,7 +552,7 @@ void setup() {
     digitalWrite(UsbPin, LOW);
     
     // Inicjalizacja I2C i wyświetlacza
-    Wire.begin(I2C_SDA, I2C_SCL);
+    //Wire.begin(I2C_SDA, I2C_SCL);
     display.begin();
     display.enableUTF8Print();
     display.setFontDirection(0);
@@ -630,3 +631,40 @@ void loop() {
         }
     }
 }
+
+/*
+GPIO | Input	| Output     | Notes
+-----|--------|------------|---------
+0	   | PULLUP | OK	       | wysyła sygnał PWM przy rozruchu, musi być NISKI, aby przejść do trybu migania
+1	   | TX ESP	| OK	       | debugowanie danych wyjściowych podczas rozruchu
+2	   | OK	    | OK	       | podłączony do wbudowanej diody LED, musi pozostać pływający lub NISKI, aby przejść do trybu migania
+3	   | OK	    | RX         | pin WYSOKI przy rozruchu
+4	   | OK	    | OK	       |
+5	   | OK   	| Dzień      | wyprowadza sygnał PWM przy rozruchu, pin spinający
+6	   | x	    | x	         | connected to the integrated SPI flash
+7	   | x	    | x	         | connected to the integrated SPI flash
+8	   | x      | x	         | connected to the integrated SPI flash
+9	   | x      | x	         | connected to the integrated SPI flash
+10	 | x	    | x	         | connected to the integrated SPI flash
+11	 | x	    | x	         | connected to the integrated SPI flash
+12	 | SET    | OK	       | boot fails if pulled high, strapping pin
+13	 | UP	    | OK	       |
+14	 | DOWN   | OK	       | outputs PWM signal at boot
+15	 | TEMP   | OK	       | outputs PWM signal at boot, strapping pin
+16	 | OK	    | OK         |	
+17	 | OK	    | OK         |	
+18	 | OK	    | Przód      |
+19	 | OK	    | Tył        |	
+21	 | SDA    | OK         |	
+22	 | OK	    | SCL        |	
+23	 | OK	    | OK         |	
+25	 | OK	    | OK	       |
+26	 | OK	    | OK	       |
+27	 | OK	    | OK	       |
+32	 | OK	    | USB        |	
+33	 | OK	    | OK         |	
+34	 | OK		  | input only |  
+35	 | OK		  | input only |
+36	 | OK		  | input only |
+39	 | OK		  | input only |
+*/
