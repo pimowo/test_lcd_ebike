@@ -479,6 +479,7 @@ void goToSleep() {
     digitalWrite(FrontDayPin, LOW);
     digitalWrite(FrontPin, LOW);
     digitalWrite(RealPin, LOW);
+    digitalWrite(UsbPin, LOW);
     
     // Wyłącz OLED
     display.clearBuffer();
@@ -545,7 +546,7 @@ void setup() {
     digitalWrite(FrontPin, LOW);
     digitalWrite(RealPin, LOW);
 
-    // ladowarka usb
+    // Ładowarka USB
     pinMode(UsbPin, OUTPUT);
     digitalWrite(UsbPin, LOW);
     
