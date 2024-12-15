@@ -23,6 +23,10 @@ DallasTemperature sensors(&oneWire);
 unsigned long ds18b20RequestTime = 0;
 const unsigned long DS18B20_CONVERSION_DELAY_MS = 750;
 float currentTemp = 0.0;
+#define TEMP_ERROR -999.0
+bool temperatureRequested = false;
+unsigned long tempRequestTime = 0;
+const unsigned long TEMP_CONVERSION_TIME = 750;  // Czas konwersji DS18B20
 
 // Dodaj obiekt RTC
 RTC_DS3231 rtc;
@@ -168,20 +172,6 @@ public:
 
 TemperatureSensor tempSensor;
 
-void temperatureTask(void * parameter) {
-    for(;;) {
-        if (!tempSensor.isReady()) {
-            tempSensor.requestTemperature();
-        } else {
-            float temp = tempSensor.readTemperature();
-            if (temp != -999.0) {
-                currentTemp = temp;
-            }
-        }
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Odczyt co 1 sekundę
-    }
-}
-
 void drawHorizontalLine() {
   display.drawHLine(4, 17, 122);
 }
@@ -289,10 +279,10 @@ void drawMainDisplay() {
       unitStr = "km";
       break;
     case TEMP:
-        if (currentTemp != -999.0) {
+        if (currentTemp != TEMP_ERROR && currentTemp != DEVICE_DISCONNECTED_C) {
             sprintf(valueStr, "%4.1f", currentTemp);
         } else {
-            strcpy(valueStr, "Blad");  // Pokazuj kreski jeśli błąd odczytu
+            strcpy(valueStr, "---");
         }
         unitStr = "°C";
         break;
@@ -497,18 +487,6 @@ void setup() {
     sensors.setResolution(12);  // Ustaw najwyższą rozdzielczość
     tempSensor.requestTemperature();  // Pierwsze żądanie pomiaru
     
-    
-    // Uruchom task temperatury na rdzeniu 0
-    xTaskCreatePinnedToCore(
-        temperatureTask,    // Funkcja zadania
-        "TempTask",        // Nazwa
-        2048,              // Rozmiar stosu
-        NULL,              // Parametry
-        1,                 // Priorytet
-        NULL,             // Uchwyt do zadania
-        0                  // Rdzeń (0)
-    );
-
     // Inicjalizacja RTC
     if (!rtc.begin()) {
         Serial.println("Couldn't find RTC");
@@ -593,15 +571,13 @@ void loop() {
         lastButtonCheck = currentTime;
     }
 
-    // Obsługa czujnika temperatury
+    // Obsługa temperatury tylko wtedy gdy nie jest w trakcie konwersji
     if (!tempSensor.isReady()) {
         tempSensor.requestTemperature();
     } else {
         float temp = tempSensor.readTemperature();
         if (temp != -999.0) {
             currentTemp = temp;
-            Serial.print("Temperatura: ");
-            Serial.println(currentTemp);
         }
     }
 
