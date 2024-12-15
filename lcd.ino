@@ -18,11 +18,13 @@
 // Czujnik temperatury powietrza
 #define PIN_ONE_WIRE_BUS 15  // Pin do którego podłączony jest DS18B20
 
-OneWire oneWire(PIN_ONE_WIRE_BUS);
+OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
-unsigned long ds18b20RequestTime = 0;
-const unsigned long DS18B20_CONVERSION_DELAY_MS = 750;
-float currentTemp = 0.0;
+unsigned long lastTempRequest = 0;
+const unsigned long TEMP_REQUEST_INTERVAL = 1000;
+float currentTemp = DEVICE_DISCONNECTED_C; // Początkowa wartość
+bool conversionRequested = false;
+//float currentTemp = 0.0;
 #define TEMP_ERROR -999.0
 bool temperatureRequested = false;
 unsigned long tempRequestTime = 0;
@@ -466,6 +468,22 @@ void goToSleep() {
     esp_deep_sleep_start();
 }
 
+void handleTemperature() {
+    unsigned long currentMillis = millis();
+    
+    if (!conversionRequested && (currentMillis - lastTempRequest >= TEMP_REQUEST_INTERVAL)) {
+        sensors.requestTemperatures();
+        conversionRequested = true;
+        lastTempRequest = currentMillis;
+    }
+    
+    if (conversionRequested && (currentMillis - lastTempRequest >= 750)) {
+        currentTemp = sensors.getTempCByIndex(0);
+        conversionRequested = false;
+    }
+}
+
+
 void setup() {
     // Sprawdź przyczynę wybudzenia
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -476,13 +494,7 @@ void setup() {
 
     // Inicjalizacja DS18B20
     sensors.begin();
-    Serial.println("Inicjalizacja DS18B20...");
-    Serial.print("Znaleziono czujników: ");
-    Serial.println(sensors.getDeviceCount());
-    
-    if (sensors.getDeviceCount() == 0) {
-        Serial.println("Nie znaleziono czujnika DS18B20!");
-    }
+    sensors.setWaitForConversion(false);  // Ważne - tryb nieblokujący
     
     sensors.setResolution(12);  // Ustaw najwyższą rozdzielczość
     tempSensor.requestTemperature();  // Pierwsze żądanie pomiaru
@@ -571,16 +583,6 @@ void loop() {
         lastButtonCheck = currentTime;
     }
 
-    // Obsługa temperatury tylko wtedy gdy nie jest w trakcie konwersji
-    if (!tempSensor.isReady()) {
-        tempSensor.requestTemperature();
-    } else {
-        float temp = tempSensor.readTemperature();
-        if (temp != -999.0) {
-            currentTemp = temp;
-        }
-    }
-
     // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla komunikatów
     if (displayActive && messageStartTime == 0) {
         display.clearBuffer();
@@ -591,6 +593,7 @@ void loop() {
         drawMainDisplay();
         drawLightStatus();
         display.sendBuffer();
+        handleTemperature();
 
         if (currentTime - lastUpdate >= updateInterval) {  
             speed = (speed >= 35.0) ? 0.0 : speed + 0.1;
