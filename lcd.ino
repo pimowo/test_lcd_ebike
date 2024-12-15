@@ -482,6 +482,8 @@ void setup() {
     
     Serial.begin(115200);
 
+    Wire.begin();
+
     // Inicjalizacja DS18B20
     sensors.begin();
     Serial.println("Inicjalizacja DS18B20...");
