@@ -119,6 +119,10 @@ public:
     }
 };
 
+bool isValidTemperature(float temp) {
+    return (temp >= -50.0f && temp <= 100.0f);
+}
+
 class TemperatureSensor {
 private:
     TimeoutHandler conversionTimeout;
@@ -512,7 +516,7 @@ void setup() {
         1,                 // Priorytet
         NULL,             // Uchwyt do zadania
         0                  // Rdzeń (0)
-    )
+    );
 
     // Inicjalizacja RTC
     if (!rtc.begin()) {
