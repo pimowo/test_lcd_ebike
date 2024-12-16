@@ -160,6 +160,7 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 Settings bikeSettings;
 Settings storedSettings;
+TemperatureSensor tempSensor;
 
 // --- Obiekty BLE ---
 BLEClient* bleClient;
@@ -202,47 +203,67 @@ public:
     }
 };
 
+// class TemperatureSensor {
+// private:
+//     TimeoutHandler conversionTimeout;
+//     TimeoutHandler readTimeout;
+//     bool conversionInProgress;
+
+// public:
+//     TemperatureSensor() : 
+//         conversionTimeout(DS18B20_CONVERSION_DELAY_MS),
+//         readTimeout(1000),  // 1 sekunda na odczyt
+//         conversionInProgress(false) {}
+
+//     void requestTemperature() {
+//         if (conversionInProgress) return;
+        
+//         sensors.requestTemperatures();
+//         conversionTimeout.start();
+//         conversionInProgress = true;
+//     }
+
+//     bool isReady() {
+//         if (!conversionInProgress) return false;
+//         if (conversionTimeout.isExpired()) {
+//             conversionInProgress = false;
+//             return true;
+//         }
+//         return false;
+//     }
+
+//     float readTemperature() {
+//         if (!conversionInProgress) return -999.0;
+
+//         readTimeout.start();
+//         float temp = sensors.getTempCByIndex(0);
+
+//         if (readTimeout.isExpired()) {
+//             return -999.0;
+//         }
+
+//         conversionInProgress = false;
+//         return isValidTemperature(temp) ? temp : -999.0;
+//     }
+// };
+
 class TemperatureSensor {
 private:
-    TimeoutHandler conversionTimeout;
-    TimeoutHandler readTimeout;
-    bool conversionInProgress;
-
+    static constexpr float INVALID_TEMP = -999.0f;
+    static constexpr float MIN_VALID_TEMP = -50.0f;
+    static constexpr float MAX_VALID_TEMP = 100.0f;
+    
 public:
-    TemperatureSensor() : 
-        conversionTimeout(DS18B20_CONVERSION_DELAY_MS),
-        readTimeout(1000),  // 1 sekunda na odczyt
-        conversionInProgress(false) {}
-
-    void requestTemperature() {
-        if (conversionInProgress) return;
-        
-        sensors.requestTemperatures();
-        conversionTimeout.start();
-        conversionInProgress = true;
+    bool isValidTemperature(float temp) {
+        return temp >= MIN_VALID_TEMP && temp <= MAX_VALID_TEMP;
     }
-
-    bool isReady() {
-        if (!conversionInProgress) return false;
-        if (conversionTimeout.isExpired()) {
-            conversionInProgress = false;
-            return true;
-        }
-        return false;
-    }
-
+    
     float readTemperature() {
-        if (!conversionInProgress) return -999.0;
-
-        readTimeout.start();
+        if (!conversionRequested) return INVALID_TEMP;
+        
         float temp = sensors.getTempCByIndex(0);
-
-        if (readTimeout.isExpired()) {
-            return -999.0;
-        }
-
-        conversionInProgress = false;
-        return isValidTemperature(temp) ? temp : -999.0;
+        conversionRequested = false;
+        return isValidTemperature(temp) ? temp : INVALID_TEMP;
     }
 };
 
@@ -383,12 +404,12 @@ void drawTopBar() {
 
   // Bateria
   char battStr[5];
-  sprintf(battStr, "%d%%", batteryPercent);
+  sprintf(battStr, "%d%%", battery_capacity_percent);
   display.drawStr(60, 13, battStr);
   
   // Napięcie
   char voltStr[6];
-  sprintf(voltStr, "%.0fV", batteryVoltage);
+  sprintf(voltStr, "%.0fV", battery_voltage);
   display.drawStr(100, 13, voltStr);
 }
 
@@ -500,12 +521,12 @@ void drawMainDisplay() {
                         descText = "> Zasieg";
                         break;
                     case DISTANCE_KM:
-                        sprintf(valueStr, "%4.1f", tripDistance);
+                        sprintf(valueStr, "%4.1f", distance_km);
                         unitStr = "km";
                         descText = "> Dystans";
                         break;
                     case ODOMETER_KM:
-                        sprintf(valueStr, "%4.0f", totalDistance);
+                        sprintf(valueStr, "%4.0f", odometer_km);
                         unitStr = "km";
                         descText = "> Przebieg";
                         break;
@@ -515,7 +536,7 @@ void drawMainDisplay() {
             case BATTERY_SCREEN:
                 switch (currentSubScreen) {
                     case BATTERY_VOLTAGE:
-                        sprintf(valueStr, "%4.1f", batteryVoltage);
+                        sprintf(valueStr, "%4.1f", battery_voltage);
                         unitStr = "V";
                         descText = "> Napiecie";
                         break;
@@ -530,12 +551,12 @@ void drawMainDisplay() {
                         descText = "> Pojemnosc";
                         break;
                     case BATTERY_CAPACITY_AH:
-                        sprintf(valueStr, "%4.1f", batteryCapacity);
+                        sprintf(valueStr, "%4.1f", battery_capacity_wh);
                         unitStr = "Ah";
                         descText = "> Pojemnosc";
                         break;
                     case BATTERY_CAPACITY_PERCENT:
-                        sprintf(valueStr, "%3d", batteryPercent);
+                        sprintf(valueStr, "%3d", battery_capacity_percent);
                         unitStr = "%";
                         descText = "> Bateria";
                         break;
@@ -545,7 +566,7 @@ void drawMainDisplay() {
             case POWER_SCREEN:
                 switch (currentSubScreen) {
                     case POWER_W:
-                        sprintf(valueStr, "%4d", power);
+                        sprintf(valueStr, "%4d", power_w);
                         unitStr = "W";
                         descText = "> Moc";
                         break;
@@ -994,9 +1015,9 @@ void loop() {
               temp_controller = 25.0 + random(15);
               temp_motor = 30.0 + random(20);
               range_km = 50.0 - (random(20) / 10.0);
-              tripDistance += 0.1;
-              totalDistance += 0.1;
-              power = 100 + random(300);
+              distance_km += 0.1;
+              odometer_km += 0.1;
+              power_w = 100 + random(300);
               power_avg_w = power * 0.8;
               power_max_w = power * 1.2;
               battery_current = random(50, 150) / 10.0;
@@ -1004,14 +1025,14 @@ void loop() {
               pressure_bar = 2.0 + (random(20) / 10.0);
               pressure_voltage = 0.5 + (random(20) / 100.0);
               pressure_temp = 20.0 + (random(100) / 10.0); 
-            speed = (speed >= 35.0) ? 0.0 : speed + 0.1;
-            tripDistance += 0.1;
-            totalDistance += 0.1;
-            power = 100 + random(300);
+            speed_kmh = (speed_kmh >= 35.0) ? 0.0 : speed_kmh + 0.1;
+            distance_km += 0.1;
+            odometer_km += 0.1;
+            power_w = 100 + random(300);
             energyConsumption += 0.2;
-            batteryCapacity = 14.5 - (random(20) / 10.0);
+            battery_capacity_wh = 14.5 - (random(20) / 10.0);
             batteryPercent = (batteryPercent <= 0) ? 100 : batteryPercent - 1;
-            batteryVoltage = (batteryVoltage <= 42.0) ? 50.0 : batteryVoltage - 0.1;
+            battery_voltage = (battery_voltage <= 42.0) ? 50.0 : battery_voltage - 0.1;
             assistMode = (assistMode + 1) % 4;
             lastUpdate = currentTime;
         }
