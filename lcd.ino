@@ -160,7 +160,6 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 Settings bikeSettings;
 Settings storedSettings;
-TemperatureSensor tempSensor;
 
 // --- Obiekty BLE ---
 BLEClient* bleClient;
@@ -266,6 +265,8 @@ public:
         return isValidTemperature(temp) ? temp : INVALID_TEMP;
     }
 };
+
+TemperatureSensor tempSensor;
 
 // --- Deklaracje funkcji ---
 // Funkcje BLE
@@ -626,12 +627,12 @@ void drawMainDisplay() {
                 descText = "Zasieg";
                 break;
             case BATTERY_SCREEN:
-                sprintf(valueStr, "%3d", batteryPercent);
+                sprintf(valueStr, "%3d", battery_capacity_percent);
                 unitStr = "%";
                 descText = "Bateria";
                 break;
             case POWER_SCREEN:
-                sprintf(valueStr, "%4d", power);
+                sprintf(valueStr, "%4d", power_w);
                 unitStr = "W";
                 descText = "Moc";
                 break;
@@ -1010,28 +1011,27 @@ void loop() {
         handleTemperature();
 
         if (currentTime - lastUpdate >= updateInterval) { 
-              speed_kmh = (speed_kmh >= 35.0) ? 0.0 : speed_kmh + 0.1;
-              cadence_rpm = random(60, 90);
-              temp_controller = 25.0 + random(15);
-              temp_motor = 30.0 + random(20);
-              range_km = 50.0 - (random(20) / 10.0);
-              distance_km += 0.1;
-              odometer_km += 0.1;
-              power_w = 100 + random(300);
-              power_avg_w = power * 0.8;
-              power_max_w = power * 1.2;
-              battery_current = random(50, 150) / 10.0;
-              battery_capacity_wh = batteryCapacity * batteryVoltage;
-              pressure_bar = 2.0 + (random(20) / 10.0);
-              pressure_voltage = 0.5 + (random(20) / 100.0);
-              pressure_temp = 20.0 + (random(100) / 10.0); 
+            speed_kmh = (speed_kmh >= 35.0) ? 0.0 : speed_kmh + 0.1;
+            cadence_rpm = random(60, 90);
+            temp_controller = 25.0 + random(15);
+            temp_motor = 30.0 + random(20);
+            range_km = 50.0 - (random(20) / 10.0);
+            distance_km += 0.1;
+            odometer_km += 0.1;
+            power_w = 100 + random(300);
+            power_avg_w = power_w * 0.8;
+            power_max_w = power_w * 1.2;
+            battery_current = random(50, 150) / 10.0;
+            battery_capacity_wh = battery_voltage * battery_capacity_ah;
+            pressure_bar = 2.0 + (random(20) / 10.0);
+            pressure_voltage = 0.5 + (random(20) / 100.0);
+            pressure_temp = 20.0 + (random(100) / 10.0); 
             speed_kmh = (speed_kmh >= 35.0) ? 0.0 : speed_kmh + 0.1;
             distance_km += 0.1;
             odometer_km += 0.1;
             power_w = 100 + random(300);
-            energyConsumption += 0.2;
             battery_capacity_wh = 14.5 - (random(20) / 10.0);
-            batteryPercent = (batteryPercent <= 0) ? 100 : batteryPercent - 1;
+            battery_capacity_percent = (battery_capacity_percent <= 0) ? 100 : battery_capacity_percent - 1;
             battery_voltage = (battery_voltage <= 42.0) ? 50.0 : battery_voltage - 0.1;
             assistMode = (assistMode + 1) % 4;
             lastUpdate = currentTime;
