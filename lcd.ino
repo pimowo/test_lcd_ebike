@@ -506,7 +506,7 @@ void drawMainDisplay() {
                     case CADENCE_RPM:
                         sprintf(valueStr, "%4d", cadence_rpm);
                         unitStr = "RPM";
-                        descText = "Kadencja";
+                        descText = "> Kadencja";
                         break;
                 }
                 break;
@@ -525,12 +525,12 @@ void drawMainDisplay() {
                     case TEMP_CONTROLLER:
                         sprintf(valueStr, "%4.1f", temp_controller);
                         unitStr = "°C";
-                        descText = "Sterownik";
+                        descText = "> Sterownik";
                         break;
                     case TEMP_MOTOR:
                         sprintf(valueStr, "%4.1f", temp_motor);
                         unitStr = "°C";
-                        descText = "Silnik";
+                        descText = "> Silnik";
                         break;
                 }
                 break;
@@ -545,12 +545,12 @@ void drawMainDisplay() {
                     case DISTANCE_KM:
                         sprintf(valueStr, "%4.1f", tripDistance);
                         unitStr = "km";
-                        descText = "Dystans";
+                        descText = "> Dystans";
                         break;
                     case ODOMETER_KM:
                         sprintf(valueStr, "%4.0f", totalDistance);
                         unitStr = "km";
-                        descText = "Przebieg";
+                        descText = "> Przebieg";
                         break;
                 }
                 break;
@@ -565,22 +565,22 @@ void drawMainDisplay() {
                     case BATTERY_CURRENT:
                         sprintf(valueStr, "%4.1f", battery_current);
                         unitStr = "A";
-                        descText = "Prad";
+                        descText = "> Prad";
                         break;
                     case BATTERY_CAPACITY_WH:
                         sprintf(valueStr, "%4.0f", battery_capacity_wh);
                         unitStr = "Wh";
-                        descText = "Pojemnosc";
+                        descText = "> Pojemnosc";
                         break;
                     case BATTERY_CAPACITY_AH:
                         sprintf(valueStr, "%4.1f", batteryCapacity);
                         unitStr = "Ah";
-                        descText = "Pojemnosc";
+                        descText = "> Pojemnosc";
                         break;
                     case BATTERY_CAPACITY_PERCENT:
                         sprintf(valueStr, "%3d", batteryPercent);
                         unitStr = "%";
-                        descText = "Bateria";
+                        descText = "> Bateria";
                         break;
                 }
                 break;
@@ -595,12 +595,12 @@ void drawMainDisplay() {
                     case POWER_AVG_W:
                         sprintf(valueStr, "%4d", power_avg_w);
                         unitStr = "W";
-                        descText = "Moc AVG";
+                        descText = "> Moc AVG";
                         break;
                     case POWER_MAX_W:
                         sprintf(valueStr, "%4d", power_max_w);
                         unitStr = "W";
-                        descText = "Moc MAX";
+                        descText = "> Moc MAX";
                         break;
                 }
                 break;
@@ -615,12 +615,12 @@ void drawMainDisplay() {
                     case PRESSURE_VOLTAGE:
                         sprintf(valueStr, "%4.2f", pressure_voltage);
                         unitStr = "V";
-                        descText = "Napiecie";
+                        descText = "> Napiecie";
                         break;
                     case PRESSURE_TEMP:
                         sprintf(valueStr, "%4.1f", pressure_temp);
                         unitStr = "°C";
-                        descText = "Temperatura";
+                        descText = "> Temperatura";
                         break;
                 }
                 break;
@@ -738,6 +738,7 @@ void handleButtons() {
 
         // Obsługa przycisku SET (nawigacja po menu)
         if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+            // Wciśnięcie przycisku SET
             if (!setPressStartTime) {
                 setPressStartTime = currentTime;
             } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
@@ -754,26 +755,30 @@ void handleButtons() {
             unsigned long pressDuration = currentTime - setPressStartTime;
             
             if (!setLongPressExecuted && pressDuration < LONG_PRESS_TIME) {
-                // Krótkie naciśnięcie - obsługa pojedynczego/podwójnego kliknięcia
+                // Krótkie naciśnięcie
                 if (firstClick && (currentTime - lastClickTime) < DOUBLE_CLICK_TIME) {
-                    // Podwójne kliknięcie - wejście/wyjście z pod-ekranów
+                    // Podwójne kliknięcie
                     if (inSubScreen) {
+                        // Wyjście z pod-ekranów
                         inSubScreen = false;
                     } else if (hasSubScreens(currentMainScreen)) {
+                        // Wejście do pod-ekranów
                         inSubScreen = true;
                         currentSubScreen = 0;
                     }
                     firstClick = false;
                 } else {
-                    // Pierwsze kliknięcie lub po czasie na podwójne
+                    // Pojedyncze kliknięcie
                     if (!firstClick) {
                         firstClick = true;
                         lastClickTime = currentTime;
                     } else if ((currentTime - lastClickTime) >= DOUBLE_CLICK_TIME) {
-                        // Pojedyncze kliknięcie - przełączanie ekranów
+                        // Zwykłe przełączanie ekranów
                         if (inSubScreen) {
+                            // W pod-ekranach - przełącz pod-ekran
                             currentSubScreen = (currentSubScreen + 1) % getSubScreenCount(currentMainScreen);
                         } else {
+                            // W głównym menu - przełącz ekran główny
                             currentMainScreen = (MainScreen)((currentMainScreen + 1) % MAIN_SCREEN_COUNT);
                         }
                         firstClick = false;
@@ -784,11 +789,11 @@ void handleButtons() {
             setLongPressExecuted = false;
             lastDebounceTime = currentTime;
         }
-    }
 
-    // Reset flagi pierwszego kliknięcia po przekroczeniu czasu
-    if (firstClick && (currentTime - lastClickTime) >= DOUBLE_CLICK_TIME) {
-        firstClick = false;
+        // Reset flagi pierwszego kliknięcia po czasie
+        if (firstClick && (currentTime - lastClickTime) >= DOUBLE_CLICK_TIME) {
+            firstClick = false;
+        }
     }
 
     // Obsługa komunikatów powitalnych/pożegnalnych
