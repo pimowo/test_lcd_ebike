@@ -57,8 +57,11 @@ enum MainScreen {
 };
 
 enum SpeedSubScreen {
-    SPEED_KMH,
-    CADENCE_RPM,
+    SPEED_KMH,          // Aktualna prędkość
+    SPEED_AVG_KMH,      // Średnia prędkość
+    SPEED_MAX_KMH,      // Maksymalna prędkość
+    CADENCE_RPM,        // Aktualna kadencja
+    CADENCE_AVG_RPM,    // Średnia kadencja
     SPEED_SUB_COUNT
 };
 
@@ -107,8 +110,8 @@ bool displayActive = false;
 bool showingWelcome = false;
 
 #define PRESSURE_LEFT_MARGIN 52
-#define PRESSURE_TOP_LINE 32
-#define PRESSURE_BOTTOM_LINE 47
+#define PRESSURE_TOP_LINE 30
+#define PRESSURE_BOTTOM_LINE 44
 
 // --- Zmienne pomiarowe ---
 float speed_kmh = 0;
@@ -127,6 +130,9 @@ int battery_capacity_percent = 0;
 int power_w = 0;
 int power_avg_w = 0;
 int power_max_w = 0;
+float speed_avg_kmh = 0;
+float speed_max_kmh = 0;
+int cadence_avg_rpm = 0;
 // Zmienne dla czujników ciśnienia
 float pressure_bar = 0;          // przednie koło
 float pressure_rear_bar = 0;     // tylne koło
@@ -437,13 +443,25 @@ void drawAssistLevel() {
   display.drawStr(10, 54, modeText);
 }
 
+// void drawValueAndUnit(const char* valueStr, const char* unitStr) {
+//     int valueWidth = display.getStrWidth(valueStr);
+//     display.drawStr(128 - valueWidth, 43, valueStr); // Bez dodatkowego marginesu
+
+//     display.setFont(u8g2_font_profont11_tr);
+//     int unitWidth = display.getStrWidth(unitStr);
+//     display.drawStr(128 - unitWidth, 53, unitStr);
+// }
+
 void drawValueAndUnit(const char* valueStr, const char* unitStr) {
-    int valueWidth = display.getStrWidth(valueStr);
-    display.drawStr(128 - valueWidth, 43, valueStr); // Bez dodatkowego marginesu
+    // Dla PRESSURE_SCREEN wyświetlamy tylko jednostkę i opis, pomijamy wartość
+    if (currentMainScreen != PRESSURE_SCREEN) {
+        int valueWidth = display.getStrWidth(valueStr);
+        display.drawStr(128 - valueWidth, 43, valueStr); // Wyświetlamy wartość tylko dla nie-PRESSURE ekranów
+    }
 
     display.setFont(u8g2_font_profont11_tr);
     int unitWidth = display.getStrWidth(unitStr);
-    display.drawStr(128 - unitWidth, 53, unitStr);
+    display.drawStr(128 - unitWidth, 53, unitStr);  // Zawsze wyświetlamy jednostkę
 }
 
 void drawMainDisplay() {
@@ -462,10 +480,25 @@ void drawMainDisplay() {
                         unitStr = "km/h";
                         descText = "> Predkosc";
                         break;
+                    case SPEED_AVG_KMH:
+                        sprintf(valueStr, "%4.1f", speed_avg_kmh);
+                        unitStr = "km/h";
+                        descText = "> Pred. AVG";
+                        break;
+                    case SPEED_MAX_KMH:
+                        sprintf(valueStr, "%4.1f", speed_max_kmh);
+                        unitStr = "km/h";
+                        descText = "> Pred. MAX";
+                        break;
                     case CADENCE_RPM:
                         sprintf(valueStr, "%4d", cadence_rpm);
                         unitStr = "RPM";
                         descText = "> Kadencja";
+                        break;
+                    case CADENCE_AVG_RPM:
+                        sprintf(valueStr, "%4d", cadence_avg_rpm);
+                        unitStr = "RPM";
+                        descText = "> Kad. AVG";
                         break;
                 }
                 break;
@@ -576,7 +609,7 @@ void drawMainDisplay() {
                         display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE, pressureRearStr);
                         unitStr = "bar";
                         descText = "> Cisnienie";
-                        return;
+                        //return;
                         break;
                     case PRESSURE_VOLTAGE:
                         display.setFont(u8g2_font_pxplusibmvga9_mf);
@@ -588,7 +621,7 @@ void drawMainDisplay() {
                         display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE, voltageRearStr);
                         unitStr = "V";
                         descText = "> Napiecie";
-                        return;
+                        //return;
                         break;
                     case PRESSURE_TEMP:
                         display.setFont(u8g2_font_pxplusibmvga9_mf);
@@ -600,7 +633,7 @@ void drawMainDisplay() {
                         display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE, tempRearStr);
                         unitStr = "°C";
                         descText = "> Temperatura";
-                        return;
+                        //return;
                         break;
                 }
                 break;   
@@ -647,14 +680,13 @@ void drawMainDisplay() {
                 display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE, pressureRearStr);
                 unitStr = "bar";
                 descText = "Kola";
-                return;
+                //return;
                 break;
             case USB_SCREEN:
-                display.setFont(u8g2_font_profont11_tr);
-                display.drawStr(78, 33, "USB");
-                display.drawStr(62, 43, usbEnabled ? "Wlaczone" : "Wylaczone");
+                display.setFont(u8g2_font_logisoso20_tf);
+                //display.drawStr(78, 32, "USB");
+                display.drawStr(75, 43, usbEnabled ? "ON" : "OFF");
                 descText = "Wyjscie USB";
-                return;
                 break; 
         }
     }
@@ -665,7 +697,7 @@ void drawMainDisplay() {
     }
 
     display.setFont(u8g2_font_profont11_tr);
-    display.drawStr(52, 62, descText);
+    display.drawStr(50, 62, descText);
 }
 
 void handleButtons() {
@@ -1064,6 +1096,27 @@ void loop() {
             pressure_rear_voltage = 0.5 + (random(20) / 100.0);
             pressure_temp = 20.0 + (random(100) / 10.0);
             pressure_rear_temp = 20.0 + (random(100) / 10.0);
+            speed_kmh = (speed_kmh >= 35.0) ? 0.0 : speed_kmh + 0.1;          
+            // Aktualizacja średniej prędkości (przykładowa implementacja)
+            static float speed_sum = 0;
+            static int speed_count = 0;
+            speed_sum += speed_kmh;
+            speed_count++;
+            speed_avg_kmh = speed_sum / speed_count;
+            // Aktualizacja maksymalnej prędkości
+            if (speed_kmh > speed_max_kmh) {
+                speed_max_kmh = speed_kmh;
+            }
+            
+            // Aktualizacja kadencji
+            cadence_rpm = random(60, 90);
+            
+            // Aktualizacja średniej kadencji (przykładowa implementacja)
+            static int cadence_sum = 0;
+            static int cadence_count = 0;
+            cadence_sum += cadence_rpm;
+            cadence_count++;
+            cadence_avg_rpm = cadence_sum / cadence_count;
         }
     }
 }
