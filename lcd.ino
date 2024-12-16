@@ -24,12 +24,8 @@ unsigned long lastTempRequest = 0;
 const unsigned long TEMP_REQUEST_INTERVAL = 1000;
 float currentTemp = DEVICE_DISCONNECTED_C; // Początkowa wartość
 bool conversionRequested = false;
-//float currentTemp = 0.0;
 #define TEMP_ERROR -999.0
-bool temperatureRequested = false;
-unsigned long tempRequestTime = 0;
 const unsigned long TEMP_CONVERSION_TIME = 750;  // Czas konwersji DS18B20
-#define DS18B20_CONVERSION_DELAY_MS 750  // Czas konwersji w ms
 
 // Dodaj obiekt RTC
 RTC_DS3231 rtc;
@@ -81,7 +77,6 @@ bool setLongPressExecuted = false;
 float speed = 25.7;
 float tripDistance = 1.5;    // km
 float totalDistance = 123.4; // km
-float temperature = 25.3;    // °C
 int power = 250;            // W
 float energyConsumption = 12.4; // Wh
 float batteryCapacity = 14.5;   // Ah
@@ -260,82 +255,84 @@ void drawAssistLevel() {
   display.drawStr(10, 54, modeText);
 }
 
-void drawMainDisplay() {
-  display.setFont(u8g2_font_logisoso20_tf);
-  char valueStr[10];
-  const char* unitStr;
-  
-  switch(currentDisplay) {
-    case SPEED:
-      sprintf(valueStr, "%4.1f", speed);
-      unitStr = "km/h";
-      break;
-    case TRIP:
-      sprintf(valueStr, "%4.1f", tripDistance);
-      unitStr = "km";
-      break;
-    case ODOMETER:
-      //sprintf(valueStr, "%4.0f", totalDistance);
-      sprintf(valueStr, "12345", totalDistance);
-      unitStr = "km";
-      break;
-    case TEMP:
-        if (currentTemp != TEMP_ERROR && currentTemp != DEVICE_DISCONNECTED_C) {
-            sprintf(valueStr, "%4.1f", currentTemp);
-        } else {
-            strcpy(valueStr, "---");
-        }
-        unitStr = "°C";
-        break;
-    case POWER:
-      sprintf(valueStr, "%4d", power);
-      unitStr = "W";
-      break;
-    case ENERGY:
-      sprintf(valueStr, "%4.1f", energyConsumption);
-      unitStr = "Wh";
-      break;
-    case BATT_CAP:
-      sprintf(valueStr, "%4.1f", batteryCapacity);
-      unitStr = "Ah";
-      break;
-  }
-  
-  //display.drawStr(53, 43, valueStr);
+void drawValueAndUnit(const char* valueStr, const char* unitStr) {
+    int valueWidth = display.getStrWidth(valueStr);
+    display.drawStr(128 - valueWidth, 43, valueStr); // Bez dodatkowego marginesu
 
-  int valueWidth = display.getStrWidth(valueStr);
-  display.drawStr(128 - valueWidth, 43, valueStr); // Bez dodatkowego marginesu
-  
-  // Jednostka
-  display.setFont(u8g2_font_profont11_tr);
-  int unitWidth = display.getStrWidth(unitStr);
-  display.drawStr(128 - unitWidth, 53, unitStr);
-  
-  // Opis - wyrównany do prawej
-  const char* descText;
-  switch(currentDisplay) {
-    case SPEED:
-      descText = "Predkosc";
-      break;
-    case TRIP:
-      descText = "Dystans";
-      break;
-    case ODOMETER:
-      descText = "Przebieg";
-      break;
-    case TEMP:
-      descText = "Temperatura";
-      break;
-    case POWER:
-      descText = "Moc";
-      break;
-    case ENERGY:
-      descText = "Energia";
-      break;
-    case BATT_CAP:
-      descText = "Bateria";
-      break;
-  }
+    display.setFont(u8g2_font_profont11_tr);
+    int unitWidth = display.getStrWidth(unitStr);
+    display.drawStr(128 - unitWidth, 53, unitStr);
+}
+
+void drawMainDisplay() {
+    display.setFont(u8g2_font_logisoso20_tf);
+    char valueStr[10];
+    const char* unitStr;
+
+    switch(currentDisplay) {
+        case SPEED:
+            sprintf(valueStr, "%4.1f", speed);
+            unitStr = "km/h";
+            break;
+        case TRIP:
+            sprintf(valueStr, "%4.1f", tripDistance);
+            unitStr = "km";
+            break;
+        case ODOMETER:
+            sprintf(valueStr, "%4.0f", totalDistance);
+            unitStr = "km";
+            break;
+        case TEMP:
+            if (currentTemp != TEMP_ERROR && currentTemp != DEVICE_DISCONNECTED_C) {
+                sprintf(valueStr, "%4.1f", currentTemp);
+            } else {
+                strcpy(valueStr, "---");
+            }
+            unitStr = "°C";
+            break;
+        case POWER:
+            sprintf(valueStr, "%4d", power);
+            unitStr = "W";
+            break;
+        case ENERGY:
+            sprintf(valueStr, "%4.1f", energyConsumption);
+            unitStr = "Wh";
+            break;
+        case BATT_CAP:
+            sprintf(valueStr, "%4.1f", batteryCapacity);
+            unitStr = "Ah";
+            break;
+    }
+
+    drawValueAndUnit(valueStr, unitStr);
+
+    const char* descText;
+    switch(currentDisplay) {
+        case SPEED:
+            descText = "Predkosc";
+            break;
+        case TRIP:
+            descText = "Dystans";
+            break;
+        case ODOMETER:
+            descText = "Przebieg";
+            break;
+        case TEMP:
+            descText = "Temperatura";
+            break;
+        case POWER:
+            descText = "Moc";
+            break;
+        case ENERGY:
+            descText = "Energia";
+            break;
+        case BATT_CAP:
+            descText = "Bateria";
+            break;
+    }
+
+    display.drawStr(52, 62, descText);
+}
   
   //int16_t width = display.getStrWidth(descText);
   //display.drawStr(100 - width, 63, descText);
