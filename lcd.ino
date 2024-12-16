@@ -167,6 +167,116 @@ public:
 
 TemperatureSensor tempSensor;
 
+// --- Wczytywanie ustawień z EEPROM ---
+void loadSettingsFromEEPROM() {
+  // Wczytanie ustawień z EEPROM
+  EEPROM.get(0, bikeSettings);
+
+  // Skopiowanie aktualnych ustawień do storedSettings do późniejszego porównania
+  storedSettings = bikeSettings;
+
+  // Możesz dodać weryfikację wczytanych danych
+  if (bikeSettings.wheelCircumference == 0) {
+    bikeSettings.wheelCircumference = 2210;  // Domyślny obwód koła
+    bikeSettings.batteryCapacity = 10.0;     // Domyślna pojemność baterii
+    bikeSettings.daySetting = 0;
+    bikeSettings.nightSetting = 0;
+    bikeSettings.dayRearBlink = false;
+    bikeSettings.nightRearBlink = false;
+    bikeSettings.blinkInterval = 500;
+  }
+}
+
+// --- Funkcja zapisująca ustawienia do EEPROM ---
+void saveSettingsToEEPROM() {
+  // Porównaj aktualne ustawienia z poprzednio wczytanymi
+  if (memcmp(&storedSettings, &bikeSettings, sizeof(bikeSettings)) != 0) {
+    // Jeśli ustawienia się zmieniły, zapisz je do EEPROM
+    EEPROM.put(0, bikeSettings);
+    EEPROM.commit();
+
+    // Zaktualizuj storedSettings po zapisie
+    storedSettings = bikeSettings;
+  }
+}
+
+// --- Połączenie z BMS ---
+void connectToBms() {
+  if (!bleClient->isConnected()) {
+    #if DEBUG
+    Serial.println("Próba połączenia z BMS...");
+    #endif
+
+    if (bleClient->connect(bmsMacAddress)) {
+      #if DEBUG
+      Serial.println("Połączono z BMS");
+      #endif
+
+      bleService = bleClient->getService("0000ff00-0000-1000-8000-00805f9b34fb");
+      if (bleService == nullptr) {
+        #if DEBUG
+        Serial.println("Nie znaleziono usługi BMS");
+        #endif
+        bleClient->disconnect();
+        return;
+      }
+
+      bleCharacteristicTx = bleService->getCharacteristic("0000ff02-0000-1000-8000-00805f9b34fb");
+      if (bleCharacteristicTx == nullptr) {
+        #if DEBUG
+        Serial.println("Nie znaleziono charakterystyki Tx");
+        #endif
+        bleClient->disconnect();
+        return;
+      }
+
+      bleCharacteristicRx = bleService->getCharacteristic("0000ff01-0000-1000-8000-00805f9b34fb");
+      if (bleCharacteristicRx == nullptr) {
+        #if DEBUG
+        Serial.println("Nie znaleziono charakterystyki Rx");
+        #endif
+        bleClient->disconnect();
+        return;
+      }
+
+      // Rejestracja funkcji obsługi powiadomień BLE
+      if (bleCharacteristicRx->canNotify()) {
+        bleCharacteristicRx->registerForNotify(notificationCallback);
+        #if DEBUG
+        Serial.println("Zarejestrowano powiadomienia dla Rx");
+        #endif
+      } else {
+        #if DEBUG
+        Serial.println("Charakterystyka Rx nie obsługuje powiadomień");
+        #endif
+        bleClient->disconnect();
+        return;
+      }
+
+    } else {
+      #if DEBUG
+      Serial.println("Nie udało się połączyć z BMS");
+      #endif
+    }
+  }
+}
+
+void setLights() {
+    if (lightMode == 0) {
+        digitalWrite(FrontDayPin, LOW);
+        digitalWrite(FrontPin, LOW);
+        digitalWrite(RealPin, LOW);
+    } else if (lightMode == 1) {
+        digitalWrite(FrontDayPin, HIGH);
+        digitalWrite(FrontPin, LOW);
+        digitalWrite(RealPin, HIGH);
+    } else if (lightMode == 2) {
+        digitalWrite(FrontDayPin, LOW);
+        digitalWrite(FrontPin, HIGH);
+        digitalWrite(RealPin, HIGH);
+    }
+}
+
 void drawHorizontalLine() {
   display.drawHLine(4, 17, 122);
 }
@@ -373,6 +483,7 @@ void handleButtons() {
                 upPressStartTime = currentTime;
             } else if (!upLongPressExecuted && (currentTime - upPressStartTime) > LONG_PRESS_TIME) {
                 lightMode = (lightMode + 1) % 3;
+                setLights(); // Dodaj tę linię, aby aktualizować światła
                 upLongPressExecuted = true;
             }
         } else if (upState && upPressStartTime) {
@@ -524,7 +635,7 @@ void setup() {
     }
 
     // Jeśli chcesz ustawić czas, odkomentuj poniższą linię
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
 
     // Ustaw aktualny czas (rok, miesiąc, dzień, godzina, minuta, sekunda)
     //rtc.adjust(DateTime(2024, 12, 14, 13, 31, 0)); // Pamiętaj o strefie czasowej (UTC+1)
@@ -548,6 +659,7 @@ void setup() {
     digitalWrite(FrontDayPin, LOW);
     digitalWrite(FrontPin, LOW);
     digitalWrite(RealPin, LOW);
+    setLights();
 
     // Ładowarka USB
     pinMode(UsbPin, OUTPUT);
