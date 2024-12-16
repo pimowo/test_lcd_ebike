@@ -19,6 +19,85 @@ struct Settings {
   bool nightRearBlink;
   unsigned long blinkInterval;
 };
+// Typ głównych ekranów
+enum MainScreen {
+    SPEED_SCREEN,    // Ekran a
+    TEMP_SCREEN,     // Ekran b
+    RANGE_SCREEN,    // Ekran c
+    BATTERY_SCREEN,  // Ekran d
+    POWER_SCREEN,    // Ekran e
+    PRESSURE_SCREEN, // Ekran f
+    MAIN_SCREEN_COUNT
+};
+
+// Typy pod-ekranów dla każdego głównego ekranu
+enum SpeedSubScreen {
+    SPEED_KMH,
+    CADENCE_RPM,
+    SPEED_SUB_COUNT
+};
+
+enum TempSubScreen {
+    TEMP_AIR,
+    TEMP_CONTROLLER,
+    TEMP_MOTOR,
+    TEMP_SUB_COUNT
+};
+
+enum RangeSubScreen {
+    RANGE_KM,
+    DISTANCE_KM,
+    ODOMETER_KM,
+    RANGE_SUB_COUNT
+};
+
+enum BatterySubScreen {
+    BATTERY_VOLTAGE,
+    BATTERY_CURRENT,
+    BATTERY_CAPACITY_WH,
+    BATTERY_CAPACITY_AH,
+    BATTERY_CAPACITY_PERCENT,
+    BATTERY_SUB_COUNT
+};
+
+enum PowerSubScreen {
+    POWER_W,
+    POWER_AVG_W,
+    POWER_MAX_W,
+    POWER_SUB_COUNT
+};
+
+enum PressureSubScreen {
+    PRESSURE_BAR,
+    PRESSURE_VOLTAGE,
+    PRESSURE_TEMP,
+    PRESSURE_SUB_COUNT
+};
+
+MainScreen currentMainScreen = SPEED_SCREEN;
+int currentSubScreen = 0;
+bool inSubScreen = false;
+
+// Zmienne do przechowywania danych pomiarowych
+float speed_kmh = 0;
+int cadence_rpm = 0;
+float temp_air = 0;
+float temp_controller = 0;
+float temp_motor = 0;
+float range_km = 0;
+float distance_km = 0;
+float odometer_km = 0;
+float battery_voltage = 0;
+float battery_current = 0;
+float battery_capacity_wh = 0;
+float battery_capacity_ah = 0;
+int battery_capacity_percent = 0;
+int power_w = 0;
+int power_avg_w = 0;
+int power_max_w = 0;
+float pressure_bar = 0;
+float pressure_voltage = 0;
+float pressure_temp = 0;
 
 Settings bikeSettings;
 Settings storedSettings;
@@ -422,81 +501,192 @@ void drawMainDisplay() {
     display.setFont(u8g2_font_logisoso20_tf);
     char valueStr[10];
     const char* unitStr;
+    const char* descText;
 
-    switch(currentDisplay) {
-        case SPEED:
-            sprintf(valueStr, "%4.1f", speed);
-            unitStr = "km/h";
-            break;
-        case TRIP:
-            sprintf(valueStr, "%4.1f", tripDistance);
-            unitStr = "km";
-            break;
-        case ODOMETER:
-            sprintf(valueStr, "%4.0f", totalDistance);
-            unitStr = "km";
-            break;
-        case TEMP:
-            if (currentTemp != TEMP_ERROR && currentTemp != DEVICE_DISCONNECTED_C) {
-                sprintf(valueStr, "%4.1f", currentTemp);
-            } else {
-                strcpy(valueStr, "---");
-            }
-            unitStr = "°C";
-            break;
-        case POWER:
-            sprintf(valueStr, "%4d", power);
-            unitStr = "W";
-            break;
-        case ENERGY:
-            sprintf(valueStr, "%4.1f", energyConsumption);
-            unitStr = "Wh";
-            break;
-        case BATT_CAP:
-            sprintf(valueStr, "%4.1f", batteryCapacity);
-            unitStr = "Ah";
-            break;
+    if (inSubScreen) {
+        // Wyświetlanie pod-ekranów
+        switch (currentMainScreen) {
+            case SPEED_SCREEN:
+                switch (currentSubScreen) {
+                    case SPEED_KMH:
+                        sprintf(valueStr, "%4.1f", speed_kmh);
+                        unitStr = "km/h";
+                        descText = "Predkosc";
+                        break;
+                    case CADENCE_RPM:
+                        sprintf(valueStr, "%4d", cadence_rpm);
+                        unitStr = "RPM";
+                        descText = "Kadencja";
+                        break;
+                }
+                break;
+
+            case TEMP_SCREEN:
+                switch (currentSubScreen) {
+                    case TEMP_AIR:
+                        if (currentTemp != TEMP_ERROR && currentTemp != DEVICE_DISCONNECTED_C) {
+                            sprintf(valueStr, "%4.1f", currentTemp);
+                        } else {
+                            strcpy(valueStr, "---");
+                        }
+                        unitStr = "°C";
+                        descText = "Powietrze";
+                        break;
+                    case TEMP_CONTROLLER:
+                        sprintf(valueStr, "%4.1f", temp_controller);
+                        unitStr = "°C";
+                        descText = "Sterownik";
+                        break;
+                    case TEMP_MOTOR:
+                        sprintf(valueStr, "%4.1f", temp_motor);
+                        unitStr = "°C";
+                        descText = "Silnik";
+                        break;
+                }
+                break;
+
+            case RANGE_SCREEN:
+                switch (currentSubScreen) {
+                    case RANGE_KM:
+                        sprintf(valueStr, "%4.1f", range_km);
+                        unitStr = "km";
+                        descText = "Zasieg";
+                        break;
+                    case DISTANCE_KM:
+                        sprintf(valueStr, "%4.1f", tripDistance);
+                        unitStr = "km";
+                        descText = "Dystans";
+                        break;
+                    case ODOMETER_KM:
+                        sprintf(valueStr, "%4.0f", totalDistance);
+                        unitStr = "km";
+                        descText = "Przebieg";
+                        break;
+                }
+                break;
+
+            case BATTERY_SCREEN:
+                switch (currentSubScreen) {
+                    case BATTERY_VOLTAGE:
+                        sprintf(valueStr, "%4.1f", batteryVoltage);
+                        unitStr = "V";
+                        descText = "Napiecie";
+                        break;
+                    case BATTERY_CURRENT:
+                        sprintf(valueStr, "%4.1f", battery_current);
+                        unitStr = "A";
+                        descText = "Prad";
+                        break;
+                    case BATTERY_CAPACITY_WH:
+                        sprintf(valueStr, "%4.0f", battery_capacity_wh);
+                        unitStr = "Wh";
+                        descText = "Pojemnosc";
+                        break;
+                    case BATTERY_CAPACITY_AH:
+                        sprintf(valueStr, "%4.1f", batteryCapacity);
+                        unitStr = "Ah";
+                        descText = "Pojemnosc";
+                        break;
+                    case BATTERY_CAPACITY_PERCENT:
+                        sprintf(valueStr, "%3d", batteryPercent);
+                        unitStr = "%";
+                        descText = "Bateria";
+                        break;
+                }
+                break;
+
+            case POWER_SCREEN:
+                switch (currentSubScreen) {
+                    case POWER_W:
+                        sprintf(valueStr, "%4d", power);
+                        unitStr = "W";
+                        descText = "Moc";
+                        break;
+                    case POWER_AVG_W:
+                        sprintf(valueStr, "%4d", power_avg_w);
+                        unitStr = "W";
+                        descText = "Moc AVG";
+                        break;
+                    case POWER_MAX_W:
+                        sprintf(valueStr, "%4d", power_max_w);
+                        unitStr = "W";
+                        descText = "Moc MAX";
+                        break;
+                }
+                break;
+
+            case PRESSURE_SCREEN:
+                switch (currentSubScreen) {
+                    case PRESSURE_BAR:
+                        sprintf(valueStr, "%4.1f", pressure_bar);
+                        unitStr = "bar";
+                        descText = "Cisnienie";
+                        break;
+                    case PRESSURE_VOLTAGE:
+                        sprintf(valueStr, "%4.2f", pressure_voltage);
+                        unitStr = "V";
+                        descText = "Napiecie";
+                        break;
+                    case PRESSURE_TEMP:
+                        sprintf(valueStr, "%4.1f", pressure_temp);
+                        unitStr = "°C";
+                        descText = "Temperatura";
+                        break;
+                }
+                break;
+        }
+    } else {
+        // Wyświetlanie głównych ekranów
+        switch (currentMainScreen) {
+            case SPEED_SCREEN:
+                sprintf(valueStr, "%4.1f", speed_kmh);
+                unitStr = "km/h";
+                descText = "Predkosc";
+                break;
+            case TEMP_SCREEN:
+                if (currentTemp != TEMP_ERROR && currentTemp != DEVICE_DISCONNECTED_C) {
+                    sprintf(valueStr, "%4.1f", currentTemp);
+                } else {
+                    strcpy(valueStr, "---");
+                }
+                unitStr = "°C";
+                descText = "Temperatura";
+                break;
+            case RANGE_SCREEN:
+                sprintf(valueStr, "%4.1f", range_km);
+                unitStr = "km";
+                descText = "Zasieg";
+                break;
+            case BATTERY_SCREEN:
+                sprintf(valueStr, "%3d", batteryPercent);
+                unitStr = "%";
+                descText = "Bateria";
+                break;
+            case POWER_SCREEN:
+                sprintf(valueStr, "%4d", power);
+                unitStr = "W";
+                descText = "Moc";
+                break;
+            case PRESSURE_SCREEN:
+                sprintf(valueStr, "%4.1f", pressure_bar);
+                unitStr = "bar";
+                descText = "Cisnienie";
+                break;
+        }
     }
 
     drawValueAndUnit(valueStr, unitStr);
-
-    const char* descText;
-    switch(currentDisplay) {
-        case SPEED:
-            descText = "Predkosc";
-            break;
-        case TRIP:
-            descText = "Dystans";
-            break;
-        case ODOMETER:
-            descText = "Przebieg";
-            break;
-        case TEMP:
-            descText = "Temperatura";
-            break;
-        case POWER:
-            descText = "Moc";
-            break;
-        case ENERGY:
-            descText = "Energia";
-            break;
-        case BATT_CAP:
-            descText = "Bateria";
-            break;
-    }
-
+    display.setFont(u8g2_font_profont11_tr);
     display.drawStr(52, 62, descText);
 }
 
 void handleButtons() {
     unsigned long currentTime = millis();
-    
-    // Odczyt stanu przycisków
+    bool setState = digitalRead(BTN_SET);
     bool upState = digitalRead(BTN_UP);
     bool downState = digitalRead(BTN_DOWN);
-    bool setState = digitalRead(BTN_SET);
-    
-    // Obsługa przycisku SET dla wyłączonego wyświetlacza
+
+    // Obsługa włączania/wyłączania wyświetlacza (>3s SET)
     if (!displayActive) {
         if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
             if (!setPressStartTime) {
@@ -517,18 +707,18 @@ void handleButtons() {
             setLongPressExecuted = false;
             lastDebounceTime = currentTime;
         }
-        return; // Wyjdź z funkcji jeśli wyświetlacz jest wyłączony
+        return;
     }
-    
-    // Reszta obsługi przycisków gdy wyświetlacz jest włączony
-    if (!showingWelcome) { // Nie obsługuj innych przycisków podczas powitania
-        // Obsługa przycisku UP
+
+    // Obsługa przycisków gdy wyświetlacz jest aktywny
+    if (!showingWelcome) {
+        // Obsługa przycisku UP (zmiana asysty)
         if (!upState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
             if (!upPressStartTime) {
                 upPressStartTime = currentTime;
             } else if (!upLongPressExecuted && (currentTime - upPressStartTime) > LONG_PRESS_TIME) {
                 lightMode = (lightMode + 1) % 3;
-                setLights(); // Dodaj tę linię, aby aktualizować światła
+                setLights();
                 upLongPressExecuted = true;
             }
         } else if (upState && upPressStartTime) {
@@ -539,8 +729,8 @@ void handleButtons() {
             upLongPressExecuted = false;
             lastDebounceTime = currentTime;
         }
-        
-        // Obsługa przycisku DOWN
+
+        // Obsługa przycisku DOWN (zmiana asysty)
         if (!downState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
             if (!downPressStartTime) {
                 downPressStartTime = currentTime;
@@ -556,40 +746,82 @@ void handleButtons() {
             downLongPressExecuted = false;
             lastDebounceTime = currentTime;
         }
-        
-        // Obsługa przycisku SET (dla włączonego wyświetlacza)
+
+        // Obsługa przycisku SET (nawigacja po menu)
         if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
             if (!setPressStartTime) {
                 setPressStartTime = currentTime;
-            } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
-                // Wyłączanie wyświetlacza
+            } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > LONG_PRESS_TIME) {
+                // Długie naciśnięcie SET (>1s)
+                if (inSubScreen) {
+                    // Wyjście z pod-ekranów
+                    inSubScreen = false;
+                } else if (hasSubScreens(currentMainScreen)) {
+                    // Wejście do pod-ekranów
+                    inSubScreen = true;
+                    currentSubScreen = 0;
+                }
+                setLongPressExecuted = true;
+            } else if ((currentTime - setPressStartTime) > SET_LONG_PRESS) {
+                // Bardzo długie naciśnięcie SET (>3s)
                 display.clearBuffer();
                 display.setFont(u8g2_font_pxplusibmvga9_mf);
                 display.drawStr(20, 32, "Do widzenia :)");
                 display.sendBuffer();
                 messageStartTime = currentTime;
                 setLongPressExecuted = true;
-                showingWelcome = false;
             }
         } else if (setState && setPressStartTime) {
-            if (!setLongPressExecuted && (currentTime - setPressStartTime) < SET_LONG_PRESS) {
-                currentDisplay = (DisplayMode)((currentDisplay + 1) % 7);
+            if (!setLongPressExecuted && (currentTime - setPressStartTime) < LONG_PRESS_TIME) {
+                // Krótkie naciśnięcie SET
+                if (inSubScreen) {
+                    // Przełączanie pod-ekranów
+                    currentSubScreen = (currentSubScreen + 1) % getSubScreenCount(currentMainScreen);
+                } else {
+                    // Przełączanie głównych ekranów
+                    currentMainScreen = (MainScreen)((currentMainScreen + 1) % MAIN_SCREEN_COUNT);
+                }
             }
             setPressStartTime = 0;
             setLongPressExecuted = false;
             lastDebounceTime = currentTime;
         }
     }
-    
-    // Sprawdzanie czasu wyświetlania komunikatów
+
+    // Obsługa komunikatów powitalnych/pożegnalnych
     if (messageStartTime > 0 && (currentTime - messageStartTime) >= GOODBYE_DELAY) {
         if (!showingWelcome) {
-            // Koniec wyświetlania "Do widzenia" - przejdź do deep sleep
-            goToSleep();  // To wywoła funkcję deep sleep zamiast tylko wyłączać wyświetlacz
+            displayActive = false;
+            goToSleep();
         }
-        // Koniec wyświetlania "Witaj"
         messageStartTime = 0;
         showingWelcome = false;
+    }
+}
+
+// Funkcja pomocnicza sprawdzająca czy ekran ma pod-ekrany
+bool hasSubScreens(MainScreen screen) {
+    switch (screen) {
+        case SPEED_SCREEN: return SPEED_SUB_COUNT > 1;
+        case TEMP_SCREEN: return TEMP_SUB_COUNT > 1;
+        case RANGE_SCREEN: return RANGE_SUB_COUNT > 1;
+        case BATTERY_SCREEN: return BATTERY_SUB_COUNT > 1;
+        case POWER_SCREEN: return POWER_SUB_COUNT > 1;
+        case PRESSURE_SCREEN: return PRESSURE_SUB_COUNT > 1;
+        default: return false;
+    }
+}
+
+// Funkcja pomocnicza zwracająca liczbę pod-ekranów dla danego ekranu
+int getSubScreenCount(MainScreen screen) {
+    switch (screen) {
+        case SPEED_SCREEN: return SPEED_SUB_COUNT;
+        case TEMP_SCREEN: return TEMP_SUB_COUNT;
+        case RANGE_SCREEN: return RANGE_SUB_COUNT;
+        case BATTERY_SCREEN: return BATTERY_SUB_COUNT;
+        case POWER_SCREEN: return POWER_SUB_COUNT;
+        case PRESSURE_SCREEN: return PRESSURE_SUB_COUNT;
+        default: return 0;
     }
 }
 
