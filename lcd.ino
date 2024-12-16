@@ -25,7 +25,8 @@ const unsigned long TEMP_REQUEST_INTERVAL = 1000;
 float currentTemp = DEVICE_DISCONNECTED_C; // Początkowa wartość
 bool conversionRequested = false;
 #define TEMP_ERROR -999.0
-const unsigned long TEMP_CONVERSION_TIME = 750;  // Czas konwersji DS18B20
+const unsigned long DS18B20_CONVERSION_DELAY_MS = 750;  // Czas konwersji DS18B20
+unsigned long ds18b20RequestTime;
 
 // Dodaj obiekt RTC
 RTC_DS3231 rtc;
@@ -117,10 +118,6 @@ public:
         return (millis() - startTime);
     }
 };
-
-bool isValidTemperature(float temp) {
-    return (temp >= -50.0f && temp <= 100.0f);
-}
 
 class TemperatureSensor {
 private:
