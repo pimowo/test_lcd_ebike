@@ -16,7 +16,7 @@
 // Ładowarka USB
 #define UsbPin 32      // ładowarka USB
 // Czujnik temperatury powietrza
-#define PIN_ONE_WIRE_BUS 15  // Pin do którego podłączony jest DS18B20
+#define ONE_WIRE_BUS 15  // Pin do którego podłączony jest DS18B20
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -29,6 +29,7 @@ bool conversionRequested = false;
 bool temperatureRequested = false;
 unsigned long tempRequestTime = 0;
 const unsigned long TEMP_CONVERSION_TIME = 750;  // Czas konwersji DS18B20
+#define DS18B20_CONVERSION_DELAY_MS 750  // Czas konwersji w ms
 
 // Dodaj obiekt RTC
 RTC_DS3231 rtc;
@@ -49,8 +50,6 @@ bool showingWelcome = false; // Flaga dla wyświetlania powitania
 
 // Dodaj na początku pliku z innymi zmiennymi globalnymi
 bool temperatureReady = false;
-unsigned long lastTempRequest = 0;
-const unsigned long TEMP_REQUEST_INTERVAL = 1000; // 1 sekunda między pomiarami
 
 // Typ wyświetlanego parametru
 enum DisplayMode {
@@ -506,7 +505,7 @@ void setup() {
     }
 
     // Jeśli chcesz ustawić czas, odkomentuj poniższą linię
-    //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
 
     // Ustaw aktualny czas (rok, miesiąc, dzień, godzina, minuta, sekunda)
     //rtc.adjust(DateTime(2024, 12, 14, 13, 31, 0)); // Pamiętaj o strefie czasowej (UTC+1)
