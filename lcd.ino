@@ -806,11 +806,16 @@ void drawMainDisplay() {
                 display.drawStr(78, 33, "USB");
                 display.drawStr(62, 43, usbEnabled ? "Wlaczone" : "Wylaczone");
                 descText = "Wyjscie USB";
+                return;  // Wyjdź z funkcji, nie wywołuj drawValueAndUnit
                 break; 
         }
     }
 
-    drawValueAndUnit(valueStr, unitStr);
+    // Wyświetl wartości tylko jeśli nie jesteśmy na ekranie USB
+    if (currentMainScreen != USB_SCREEN) {
+      drawValueAndUnit(valueStr, unitStr);
+    }
+    
     display.setFont(u8g2_font_profont11_tr);
     display.drawStr(52, 62, descText);
 }
