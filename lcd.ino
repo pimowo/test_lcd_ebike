@@ -4,7 +4,6 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <EEPROM.h>
-#include <EEPROM.h>
 #include <BLEDevice.h>
 #include <BLEClient.h>
 #include <BLEUtils.h>
@@ -575,6 +574,28 @@ void handleButtons() {
         // Koniec wyświetlania "Witaj"
         messageStartTime = 0;
         showingWelcome = false;
+    }
+}
+
+void handleButton() {
+    if (inSubScreen) {
+        // Przełączanie pod-ekranów
+        subScreen = (subScreen + 1) % getSubScreenCount(currentScreen);
+    } else {
+        // Przełączanie głównych ekranów
+        currentScreen = (currentScreen + 1) % NUM_SCREENS;
+    }
+    longPressHandled = false; // Reset flagi długiego naciśnięcia
+}
+
+void handleLongPress() {
+    if (inSubScreen) {
+        // Wyjście z pod-ekranów
+        inSubScreen = false;
+    } else if (getSubScreenCount(currentScreen) > 0) {
+        // Wejście do pod-ekranów
+        inSubScreen = true;
+        subScreen = 0;
     }
 }
 
