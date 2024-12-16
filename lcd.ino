@@ -576,6 +576,7 @@ void drawMainDisplay() {
                         display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE, pressureRearStr);
                         unitStr = "bar";
                         descText = "> Cisnienie";
+                        return;
                         break;
                     case PRESSURE_VOLTAGE:
                         display.setFont(u8g2_font_pxplusibmvga9_mf);
@@ -587,6 +588,7 @@ void drawMainDisplay() {
                         display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE, voltageRearStr);
                         unitStr = "V";
                         descText = "> Napiecie";
+                        return;
                         break;
                     case PRESSURE_TEMP:
                         display.setFont(u8g2_font_pxplusibmvga9_mf);
@@ -598,6 +600,7 @@ void drawMainDisplay() {
                         display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE, tempRearStr);
                         unitStr = "°C";
                         descText = "> Temperatura";
+                        return;
                         break;
                 }
                 break;   
@@ -644,7 +647,7 @@ void drawMainDisplay() {
                 display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE, pressureRearStr);
                 unitStr = "bar";
                 descText = "Kola";
-                //return;
+                return;
                 break;
             case USB_SCREEN:
                 display.setFont(u8g2_font_profont11_tr);
