@@ -491,6 +491,8 @@ void drawMainDisplay() {
 void handleButtons() {
     unsigned long currentTime = millis();
     bool setState = digitalRead(BTN_SET);
+    bool upState = digitalRead(BTN_UP);
+    bool downState = digitalRead(BTN_DOWN);
 
     if (!displayActive) {
         if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
@@ -721,6 +723,7 @@ void loop() {
     if (showingWelcome && (currentTime - messageStartTime > 3000)) {
         showingWelcome = false;
         messageStartTime = 0;
+        displayActive = true; // Ustaw displayActive na true, aby umożliwić normalne działanie
     }
 
     // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla komunikatów
