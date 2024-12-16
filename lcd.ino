@@ -119,6 +119,8 @@ public:
     }
 };
 
+bool isValidTemperature(float temp);
+
 class TemperatureSensor {
 private:
     TimeoutHandler conversionTimeout;
@@ -127,7 +129,7 @@ private:
 
 public:
     TemperatureSensor() : 
-        conversionTimeout(TEMP_CONVERSION_TIME),
+        conversionTimeout(DS18B20_CONVERSION_DELAY_MS),
         readTimeout(1000),  // 1 sekunda na odczyt
         conversionInProgress(false) {}
 
