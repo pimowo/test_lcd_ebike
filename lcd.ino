@@ -490,16 +490,19 @@ void drawMainDisplay() {
 
 void handleButtons() {
     unsigned long currentTime = millis();
-    static unsigned long lastMessageTime = 0;
-    bool setState = digitalRead(BTN_SET);
+    
+    // Odczyt stanu przycisków
     bool upState = digitalRead(BTN_UP);
     bool downState = digitalRead(BTN_DOWN);
-
+    bool setState = digitalRead(BTN_SET);
+    
+    // Obsługa przycisku SET dla wyłączonego wyświetlacza
     if (!displayActive) {
         if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
             if (!setPressStartTime) {
                 setPressStartTime = currentTime;
             } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
+                // Włączanie wyświetlacza
                 display.clearBuffer();
                 display.setFont(u8g2_font_pxplusibmvga9_mf);
                 display.drawStr(40, 32, "Witaj!");
@@ -508,7 +511,6 @@ void handleButtons() {
                 setLongPressExecuted = true;
                 showingWelcome = true;
                 displayActive = true;
-                lastMessageTime = currentTime;
             }
         } else if (setState && setPressStartTime) {
             setPressStartTime = 0;
@@ -517,25 +519,74 @@ void handleButtons() {
         }
         return;
     }
-
-    if (currentTime - lastMessageTime > 1000) { // Opóźnienie 1 sekundy między komunikatami
+    
+    // Obsługa przycisków gdy wyświetlacz jest włączony
+    if (!showingWelcome) {
+        // Obsługa przycisku UP
+        if (!upState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+            if (!upPressStartTime) {
+                upPressStartTime = currentTime;
+            } else if (!upLongPressExecuted && (currentTime - upPressStartTime) > LONG_PRESS_TIME) {
+                lightMode = (lightMode + 1) % 3;
+                setLights();
+                upLongPressExecuted = true;
+            }
+        } else if (upState && upPressStartTime) {
+            if (!upLongPressExecuted && (currentTime - upPressStartTime) < LONG_PRESS_TIME) {
+                if (assistLevel < 5) assistLevel++;
+            }
+            upPressStartTime = 0;
+            upLongPressExecuted = false;
+            lastDebounceTime = currentTime;
+        }
+        
+        // Obsługa przycisku DOWN
+        if (!downState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+            if (!downPressStartTime) {
+                downPressStartTime = currentTime;
+            } else if (!downLongPressExecuted && (currentTime - downPressStartTime) > LONG_PRESS_TIME) {
+                assistLevelAsText = !assistLevelAsText;
+                downLongPressExecuted = true;
+            }
+        } else if (downState && downPressStartTime) {
+            if (!downLongPressExecuted && (currentTime - downPressStartTime) < LONG_PRESS_TIME) {
+                if (assistLevel > 0) assistLevel--;
+            }
+            downPressStartTime = 0;
+            downLongPressExecuted = false;
+            lastDebounceTime = currentTime;
+        }
+        
+        // Obsługa przycisku SET
         if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
             if (!setPressStartTime) {
                 setPressStartTime = currentTime;
             } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
-                handleLongPress();
+                display.clearBuffer();
+                display.setFont(u8g2_font_pxplusibmvga9_mf);
+                display.drawStr(20, 32, "Do widzenia :)");
+                display.sendBuffer();
+                messageStartTime = currentTime;
                 setLongPressExecuted = true;
-                lastMessageTime = currentTime;
             }
         } else if (setState && setPressStartTime) {
             if (!setLongPressExecuted && (currentTime - setPressStartTime) < SET_LONG_PRESS) {
-                handleButton();
-                lastMessageTime = currentTime;
+                currentDisplay = (DisplayMode)((currentDisplay + 1) % 7);
             }
             setPressStartTime = 0;
             setLongPressExecuted = false;
             lastDebounceTime = currentTime;
         }
+    }
+    
+    // Sprawdzanie czasu wyświetlania komunikatów
+    if (messageStartTime > 0 && (currentTime - messageStartTime) >= GOODBYE_DELAY) {
+        if (!showingWelcome) {
+            displayActive = false;
+            goToSleep();
+        }
+        messageStartTime = 0;
+        showingWelcome = false;
     }
 }
 
