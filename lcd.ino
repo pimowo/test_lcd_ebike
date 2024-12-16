@@ -106,9 +106,9 @@ bool inSubScreen = false;
 bool displayActive = false;
 bool showingWelcome = false;
 
-#define PRESSURE_LEFT_MARGIN 60
-#define PRESSURE_TOP_LINE 25
-#define PRESSURE_BOTTOM_LINE 50
+#define PRESSURE_LEFT_MARGIN 52
+#define PRESSURE_TOP_LINE 32
+#define PRESSURE_BOTTOM_LINE 47
 
 // --- Zmienne pomiarowe ---
 float speed_kmh = 0;
@@ -572,11 +572,10 @@ void drawMainDisplay() {
                         char pressureRearStr[16];
                         sprintf(pressureFrontStr, "P: %.2f", pressure_bar);
                         sprintf(pressureRearStr, "T: %.2f", pressure_rear_bar);
-                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_TOP_LINE , pressureFrontStr);
-                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE , pressureRearStr);
+                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_TOP_LINE, pressureFrontStr);
+                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE, pressureRearStr);
                         unitStr = "bar";
                         descText = "> Cisnienie";
-                        //return;
                         break;
                     case PRESSURE_VOLTAGE:
                         display.setFont(u8g2_font_pxplusibmvga9_mf);
@@ -584,11 +583,10 @@ void drawMainDisplay() {
                         char voltageRearStr[16];
                         sprintf(voltageFrontStr, "P: %.2f", pressure_voltage);
                         sprintf(voltageRearStr, "T: %.2f", pressure_rear_voltage);
-                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_TOP_LINE , voltageFrontStr);
-                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE , voltageRearStr);
+                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_TOP_LINE, voltageFrontStr);
+                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE, voltageRearStr);
                         unitStr = "V";
                         descText = "> Napiecie";
-                        //return;
                         break;
                     case PRESSURE_TEMP:
                         display.setFont(u8g2_font_pxplusibmvga9_mf);
@@ -596,11 +594,10 @@ void drawMainDisplay() {
                         char tempRearStr[16];
                         sprintf(tempFrontStr, "P: %.1f", pressure_temp);
                         sprintf(tempRearStr, "T: %.1f", pressure_rear_temp);
-                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_TOP_LINE , tempFrontStr);
-                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE , tempRearStr);
+                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_TOP_LINE, tempFrontStr);
+                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE, tempRearStr);
                         unitStr = "°C";
                         descText = "> Temperatura";
-                        //return;
                         break;
                 }
                 break;   
@@ -641,13 +638,13 @@ void drawMainDisplay() {
                 display.setFont(u8g2_font_pxplusibmvga9_mf);
                 char pressureFrontStr[16];
                 char pressureRearStr[16];
-                sprintf(pressureFrontStr, "P: %.1f", pressure_bar);
-                sprintf(pressureRearStr, "T: %.1f", pressure_rear_bar );
-                display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_TOP_LINE , pressureFrontStr);
-                display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE , pressureRearStr);
+                sprintf(pressureFrontStr, "P: %.2f", pressure_bar);
+                sprintf(pressureRearStr, "T: %.2f", pressure_rear_bar);
+                display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_TOP_LINE, pressureFrontStr);
+                display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE, pressureRearStr);
                 unitStr = "bar";
                 descText = "Kola";
-                //return;  // Zapobiegamy wykonaniu drawValueAndUnit
+                //return;
                 break;
             case USB_SCREEN:
                 display.setFont(u8g2_font_profont11_tr);
