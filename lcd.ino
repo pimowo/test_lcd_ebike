@@ -490,6 +490,7 @@ void drawMainDisplay() {
 
 void handleButtons() {
     unsigned long currentTime = millis();
+    static unsigned long lastMessageTime = 0;
     bool setState = digitalRead(BTN_SET);
     bool upState = digitalRead(BTN_UP);
     bool downState = digitalRead(BTN_DOWN);
@@ -507,6 +508,7 @@ void handleButtons() {
                 setLongPressExecuted = true;
                 showingWelcome = true;
                 displayActive = true;
+                lastMessageTime = currentTime;
             }
         } else if (setState && setPressStartTime) {
             setPressStartTime = 0;
@@ -516,20 +518,24 @@ void handleButtons() {
         return;
     }
 
-    if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
-        if (!setPressStartTime) {
-            setPressStartTime = currentTime;
-        } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
-            handleLongPress();
-            setLongPressExecuted = true;
+    if (currentTime - lastMessageTime > 1000) { // Opóźnienie 1 sekundy między komunikatami
+        if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+            if (!setPressStartTime) {
+                setPressStartTime = currentTime;
+            } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
+                handleLongPress();
+                setLongPressExecuted = true;
+                lastMessageTime = currentTime;
+            }
+        } else if (setState && setPressStartTime) {
+            if (!setLongPressExecuted && (currentTime - setPressStartTime) < SET_LONG_PRESS) {
+                handleButton();
+                lastMessageTime = currentTime;
+            }
+            setPressStartTime = 0;
+            setLongPressExecuted = false;
+            lastDebounceTime = currentTime;
         }
-    } else if (setState && setPressStartTime) {
-        if (!setLongPressExecuted && (currentTime - setPressStartTime) < SET_LONG_PRESS) {
-            handleButton();
-        }
-        setPressStartTime = 0;
-        setLongPressExecuted = false;
-        lastDebounceTime = currentTime;
     }
 }
 
@@ -537,9 +543,13 @@ void handleButton() {
     if (inSubScreen) {
         // Przełączanie pod-ekranów
         subScreen = (subScreen + 1) % getSubScreenCount(currentScreen);
+        Serial.print("Sub-screen changed to: ");
+        Serial.println(subScreen);
     } else {
         // Przełączanie głównych ekranów
         currentScreen = (currentScreen + 1) % NUM_SCREENS;
+        Serial.print("Main screen changed to: ");
+        Serial.println(currentScreen);
     }
     longPressHandled = false; // Reset flagi długiego naciśnięcia
 }
@@ -548,10 +558,12 @@ void handleLongPress() {
     if (inSubScreen) {
         // Wyjście z pod-ekranów
         inSubScreen = false;
+        Serial.println("Exited sub-screen");
     } else if (getSubScreenCount(currentScreen) > 0) {
         // Wejście do pod-ekranów
         inSubScreen = true;
         subScreen = 0;
+        Serial.println("Entered sub-screen");
     }
 }
 
@@ -705,12 +717,59 @@ void setup() {
     }
 }
 
+// void loop() {
+//     static unsigned long lastButtonCheck = 0;
+//     static unsigned long lastUpdate = 0;
+//     const unsigned long buttonInterval = 5;
+//     const unsigned long updateInterval = 2000;
+
+//     unsigned long currentTime = millis();
+
+//     if (currentTime - lastButtonCheck >= buttonInterval) {
+//         handleButtons();
+//         lastButtonCheck = currentTime;
+//     }
+
+//     if (showingWelcome && (currentTime - messageStartTime > 3000)) {
+//         showingWelcome = false;
+//         messageStartTime = 0;
+//         displayActive = true; // Ustaw displayActive na true, aby umożliwić normalne działanie
+//         Serial.println("Welcome message timeout, switching to main display");
+//     }
+
+//     if (displayActive && messageStartTime == 0) {
+//         display.clearBuffer();
+//         drawTopBar();
+//         drawHorizontalLine();
+//         drawVerticalLine();
+//         drawAssistLevel();
+//         drawMainDisplay();
+//         drawLightStatus();
+//         display.sendBuffer();
+//         handleTemperature();
+
+//         if (currentTime - lastUpdate >= updateInterval) {  
+//             speed = (speed >= 35.0) ? 0.0 : speed + 0.1;
+//             tripDistance += 0.1;
+//             totalDistance += 0.1;
+//             power = 100 + random(300);
+//             energyConsumption += 0.2;
+//             batteryCapacity = 14.5 - (random(20) / 10.0);
+//             batteryPercent = (batteryPercent <= 0) ? 100 : batteryPercent - 1;
+//             batteryVoltage = (batteryVoltage <= 42.0) ? 50.0 : batteryVoltage - 0.1;
+//             assistMode = (assistMode + 1) % 4;
+//             lastUpdate = currentTime;
+//         }
+//     }
+// }
+
 void loop() {
     static unsigned long lastButtonCheck = 0;
     static unsigned long lastUpdate = 0;
     const unsigned long buttonInterval = 5;
     const unsigned long updateInterval = 2000;
     static unsigned long lastTempUpdate = 0;
+    static unsigned long lastMessageUpdate = 0;
 
     unsigned long currentTime = millis();
 
@@ -719,15 +778,15 @@ void loop() {
         lastButtonCheck = currentTime;
     }
 
-    // Sprawdź, czy wyświetla się komunikat "Witaj!" i wyłącz go po 3 sekundach
     if (showingWelcome && (currentTime - messageStartTime > 3000)) {
         showingWelcome = false;
         messageStartTime = 0;
         displayActive = true; // Ustaw displayActive na true, aby umożliwić normalne działanie
+        Serial.println("Welcome message timeout, switching to main display");
+        lastMessageUpdate = currentTime;
     }
 
-    // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla komunikatów
-    if (displayActive && messageStartTime == 0) {
+    if (displayActive && messageStartTime == 0 && (currentTime - lastMessageUpdate > 1000)) { // Opóźnienie 1 sekundy między aktualizacjami ekranu
         display.clearBuffer();
         drawTopBar();
         drawHorizontalLine();
@@ -737,8 +796,10 @@ void loop() {
         drawLightStatus();
         display.sendBuffer();
         handleTemperature();
+        Serial.println("Display updated");
+        lastMessageUpdate = currentTime;
 
-        if (currentTime - lastUpdate >= updateInterval) {  
+        if (currentTime - lastUpdate >= updateInterval) {
             speed = (speed >= 35.0) ? 0.0 : speed + 0.1;
             tripDistance += 0.1;
             totalDistance += 0.1;
@@ -749,6 +810,7 @@ void loop() {
             batteryVoltage = (batteryVoltage <= 42.0) ? 50.0 : batteryVoltage - 0.1;
             assistMode = (assistMode + 1) % 4;
             lastUpdate = currentTime;
+            Serial.println("Simulated data updated");
         }
     }
 }
