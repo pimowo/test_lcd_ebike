@@ -101,7 +101,7 @@ float pressure_voltage = 0;
 float pressure_temp = 0;
 
 // Zmienne dla obsługi podwójnego kliknięcia
-const unsigned long DOUBLE_CLICK_TIME = 250;  // Maksymalny czas między kliknięciami (250ms)
+const unsigned long DOUBLE_CLICK_TIME = 300;  // Maksymalny czas między kliknięciami (250ms)
 unsigned long lastClickTime = 0;              // Czas ostatniego kliknięcia
 bool firstClick = false;                      // Flaga pierwszego kliknięcia
 
@@ -501,7 +501,7 @@ void drawMainDisplay() {
                     case SPEED_KMH:
                         sprintf(valueStr, "%4.1f", speed_kmh);
                         unitStr = "km/h";
-                        descText = "Predkosc";
+                        descText = "> Predkosc";
                         break;
                     case CADENCE_RPM:
                         sprintf(valueStr, "%4d", cadence_rpm);
@@ -520,7 +520,7 @@ void drawMainDisplay() {
                             strcpy(valueStr, "---");
                         }
                         unitStr = "°C";
-                        descText = "Powietrze";
+                        descText = "> Powietrze";
                         break;
                     case TEMP_CONTROLLER:
                         sprintf(valueStr, "%4.1f", temp_controller);
@@ -540,7 +540,7 @@ void drawMainDisplay() {
                     case RANGE_KM:
                         sprintf(valueStr, "%4.1f", range_km);
                         unitStr = "km";
-                        descText = "Zasieg";
+                        descText = "> Zasieg";
                         break;
                     case DISTANCE_KM:
                         sprintf(valueStr, "%4.1f", tripDistance);
@@ -560,7 +560,7 @@ void drawMainDisplay() {
                     case BATTERY_VOLTAGE:
                         sprintf(valueStr, "%4.1f", batteryVoltage);
                         unitStr = "V";
-                        descText = "Napiecie";
+                        descText = "> Napiecie";
                         break;
                     case BATTERY_CURRENT:
                         sprintf(valueStr, "%4.1f", battery_current);
@@ -590,7 +590,7 @@ void drawMainDisplay() {
                     case POWER_W:
                         sprintf(valueStr, "%4d", power);
                         unitStr = "W";
-                        descText = "Moc";
+                        descText = "> Moc";
                         break;
                     case POWER_AVG_W:
                         sprintf(valueStr, "%4d", power_avg_w);
@@ -610,7 +610,7 @@ void drawMainDisplay() {
                     case PRESSURE_BAR:
                         sprintf(valueStr, "%4.1f", pressure_bar);
                         unitStr = "bar";
-                        descText = "Cisnienie";
+                        descText = "> Cisnienie";
                         break;
                     case PRESSURE_VOLTAGE:
                         sprintf(valueStr, "%4.2f", pressure_voltage);
@@ -736,13 +736,15 @@ void handleButtons() {
             lastDebounceTime = currentTime;
         }
 
-        // Obsługa przycisku SET (nawigacja po menu)
-        if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
-            // Wciśnięcie przycisku SET
+        // Obsługa przycisku SET
+        static unsigned long lastSetRelease = 0;
+        static bool waitingForSecondClick = false;
+
+        if (!setState) { // Przycisk wciśnięty
             if (!setPressStartTime) {
                 setPressStartTime = currentTime;
             } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
-                // Bardzo długie naciśnięcie SET (>3s) - wyłączenie wyświetlacza
+                // Długie przytrzymanie (>3s) - wyłączenie
                 display.clearBuffer();
                 display.setFont(u8g2_font_pxplusibmvga9_mf);
                 display.drawStr(20, 32, "Do widzenia :)");
@@ -750,38 +752,32 @@ void handleButtons() {
                 messageStartTime = currentTime;
                 setLongPressExecuted = true;
             }
-        } else if (setState && setPressStartTime) {
-            // Puszczenie przycisku SET
-            unsigned long pressDuration = currentTime - setPressStartTime;
-            
-            if (!setLongPressExecuted && pressDuration < LONG_PRESS_TIME) {
-                // Krótkie naciśnięcie
-                if (firstClick && (currentTime - lastClickTime) < DOUBLE_CLICK_TIME) {
+        } else if (setPressStartTime) { // Przycisk puszczony
+            if (!setLongPressExecuted) {
+                unsigned long releaseTime = currentTime;
+                
+                if (waitingForSecondClick && (releaseTime - lastSetRelease) < DOUBLE_CLICK_TIME) {
                     // Podwójne kliknięcie
                     if (inSubScreen) {
-                        // Wyjście z pod-ekranów
-                        inSubScreen = false;
+                        inSubScreen = false; // Wyjście z pod-ekranów
                     } else if (hasSubScreens(currentMainScreen)) {
-                        // Wejście do pod-ekranów
-                        inSubScreen = true;
+                        inSubScreen = true;  // Wejście do pod-ekranów
                         currentSubScreen = 0;
                     }
-                    firstClick = false;
+                    waitingForSecondClick = false;
                 } else {
                     // Pojedyncze kliknięcie
-                    if (!firstClick) {
-                        firstClick = true;
-                        lastClickTime = currentTime;
-                    } else if ((currentTime - lastClickTime) >= DOUBLE_CLICK_TIME) {
-                        // Zwykłe przełączanie ekranów
+                    if (!waitingForSecondClick) {
+                        waitingForSecondClick = true;
+                        lastSetRelease = releaseTime;
+                    } else if ((releaseTime - lastSetRelease) >= DOUBLE_CLICK_TIME) {
+                        // Przełączanie ekranów/pod-ekranów
                         if (inSubScreen) {
-                            // W pod-ekranach - przełącz pod-ekran
                             currentSubScreen = (currentSubScreen + 1) % getSubScreenCount(currentMainScreen);
                         } else {
-                            // W głównym menu - przełącz ekran główny
                             currentMainScreen = (MainScreen)((currentMainScreen + 1) % MAIN_SCREEN_COUNT);
                         }
-                        firstClick = false;
+                        waitingForSecondClick = false;
                     }
                 }
             }
@@ -790,9 +786,15 @@ void handleButtons() {
             lastDebounceTime = currentTime;
         }
 
-        // Reset flagi pierwszego kliknięcia po czasie
-        if (firstClick && (currentTime - lastClickTime) >= DOUBLE_CLICK_TIME) {
-            firstClick = false;
+        // Reset flagi oczekiwania na drugie kliknięcie po upływie czasu
+        if (waitingForSecondClick && (currentTime - lastSetRelease) >= DOUBLE_CLICK_TIME) {
+            // Wykonaj akcję pojedynczego kliknięcia
+            if (inSubScreen) {
+                currentSubScreen = (currentSubScreen + 1) % getSubScreenCount(currentMainScreen);
+            } else {
+                currentMainScreen = (MainScreen)((currentMainScreen + 1) % MAIN_SCREEN_COUNT);
+            }
+            waitingForSecondClick = false;
         }
     }
 
