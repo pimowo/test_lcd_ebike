@@ -123,9 +123,13 @@ int battery_capacity_percent = 0;
 int power_w = 0;
 int power_avg_w = 0;
 int power_max_w = 0;
-float pressure_bar = 0;
-float pressure_voltage = 0;
-float pressure_temp = 0;
+// Zmienne dla czujników ciśnienia
+float pressure_bar = 0;          // przednie koło
+float pressure_rear_bar = 0;     // tylne koło
+float pressure_voltage = 0;      // napięcie przedniego czujnika
+float pressure_rear_voltage = 0; // napięcie tylnego czujnika
+float pressure_temp = 0;         // temperatura przedniego czujnika
+float pressure_rear_temp = 0;    // temperatura tylnego czujnika
 
 // --- Zmienne dla czujnika temperatury ---
 #define TEMP_ERROR -999.0
@@ -438,192 +442,6 @@ void drawValueAndUnit(const char* valueStr, const char* unitStr) {
     display.drawStr(128 - unitWidth, 53, unitStr);
 }
 
-// void drawMainDisplay() {
-//     char valueStr[16];
-//     const char* unitStr = nullptr;
-//     const char* descText = nullptr;
-
-//     switch (currentMainScreen) {
-//         case SPEED_SCREEN:
-//             if (inSubScreen) {
-//                 switch (currentSubScreen) {
-//                     case SPEED_KMH:
-//                         sprintf(valueStr, "%4.1f", speed_kmh);
-//                         unitStr = "km/h";
-//                         break;
-//                     case CADENCE_RPM:
-//                         sprintf(valueStr, "%3d", cadence_rpm);
-//                         unitStr = "rpm";
-//                         break;
-//                 }
-//             } else {
-//                 sprintf(valueStr, "%4.1f", speed_kmh);
-//                 unitStr = "km/h";
-//             }
-//             descText = "Predkosc";
-//             break;
-
-//         case TEMP_SCREEN:
-//             if (inSubScreen) {
-//                 switch (currentSubScreen) {
-//                     case TEMP_AIR:
-//                         sprintf(valueStr, "%4.1f", temp_air);
-//                         unitStr = "C";
-//                         break;
-//                     case TEMP_CONTROLLER:
-//                         sprintf(valueStr, "%4.1f", temp_controller);
-//                         unitStr = "C";
-//                         break;
-//                     case TEMP_MOTOR:
-//                         sprintf(valueStr, "%4.1f", temp_motor);
-//                         unitStr = "C";
-//                         break;
-//                 }
-//             } else {
-//                 sprintf(valueStr, "%4.1f", temp_air);
-//                 unitStr = "C";
-//             }
-//             descText = "Temperatura";
-//             break;
-
-//         case RANGE_SCREEN:
-//             if (inSubScreen) {
-//                 switch (currentSubScreen) {
-//                     case 0:
-//                         sprintf(valueStr, "%4.1f", distance_km);
-//                         unitStr = "km";
-//                         break;
-//                     case 1:
-//                         sprintf(valueStr, "%5.1f", odometer_km);
-//                         unitStr = "km";
-//                         break;
-//                 }
-//             } else {
-//                 sprintf(valueStr, "%4.1f", distance_km);
-//                 unitStr = "km";
-//             }
-//             descText = "Zasieg";
-//             break;
-
-//         case BATTERY_SCREEN:
-//             if (inSubScreen) {
-//                 switch (currentSubScreen) {
-//                     case 0:
-//                         sprintf(valueStr, "%4.1f", battery_voltage);
-//                         unitStr = "V";
-//                         break;
-//                     case 1:
-//                         sprintf(valueStr, "%4.1f", battery_current);
-//                         unitStr = "A";
-//                         break;
-//                     case 2:
-//                         sprintf(valueStr, "%4.1f", battery_capacity_wh);
-//                         unitStr = "Wh";
-//                         break;
-//                     case 3:
-//                         sprintf(valueStr, "%3d", battery_capacity_percent);
-//                         unitStr = "%";
-//                         break;
-//                 }
-//             } else {
-//                 sprintf(valueStr, "%3d", battery_capacity_percent);
-//                 unitStr = "%";
-//             }
-//             descText = "Bateria";
-//             break;
-
-//         case POWER_SCREEN:
-//             if (inSubScreen) {
-//                 switch (currentSubScreen) {
-//                     case 0:
-//                         sprintf(valueStr, "%4d", power_w);
-//                         unitStr = "W";
-//                         break;
-//                     case 1:
-//                         sprintf(valueStr, "%4d", power_avg_w);
-//                         unitStr = "W";
-//                         break;
-//                     case 2:
-//                         sprintf(valueStr, "%4d", power_max_w);
-//                         unitStr = "W";
-//                         break;
-//                 }
-//             } else {
-//                 sprintf(valueStr, "%4d", power_w);
-//                 unitStr = "W";
-//             }
-//             descText = "Moc";
-//             break;
-
-//           case PRESSURE_SCREEN:
-//               if (inSubScreen) {
-//                   switch (currentSubScreen) {
-//                       case PRESSURE_BAR:
-//                           sprintf(valueStr, "%2.2f", pressure_bar);
-//                           unitStr = "bar";
-//                           descText = "> Cisnienie";
-//                           break;
-//                       case PRESSURE_VOLTAGE:
-//                           sprintf(valueStr, "%1.2f", pressure_voltage);
-//                           unitStr = "V";
-//                           descText = "> Napiecie";
-//                           break;
-//                       case PRESSURE_TEMP:
-//                           sprintf(valueStr, "%2.1f", pressure_temp);
-//                           unitStr = "°C";
-//                           descText = "> Temperatura";
-//                           break;
-//                     }
-//               } else {
-//                   sprintf(valueStr, "%2.2f", pressure_bar);
-//                   unitStr = "bar";
-//               }
-//               descText = "Kola";
-//               break;
-
-//         case USB_SCREEN:
-//             //display.setFont(u8g2_font_profont17_tr);  // Większa czcionka
-//             display.drawStr(78, 33, "USB");  // Wycentrowanie tekstu "USB"
-            
-//             if (usbEnabled) {
-//                 display.drawStr(62, 43, "Wlaczone");
-//             } else {
-//                 display.drawStr(62, 43, "Wylaczone");
-//             }
-            
-//             descText = "Wyjscie USB";
-//             break;
-
-//         default:
-//             descText = "???";
-//             break;
-//     }
-
-//     // Wyświetl wartość i jednostkę (jeśli nie jest to ekran USB)
-//     if (currentMainScreen != USB_SCREEN) {
-//         // display.setFont(u8g2_font_profont29_tr);
-//         // uint8_t strWidth = display.getStrWidth(valueStr);
-//         // uint8_t xPos = (128 - strWidth) / 2;
-//         // display.drawStr(xPos, 42, valueStr);
-
-//         // if (unitStr) {
-//         //     display.setFont(u8g2_font_profont17_tr);
-//         //     display.drawStr(70, 42, unitStr);
-//         // }
-//         drawValueAndUnit(valueStr, unitStr);
-//     }
-
-//     // Wyświetl opis na dole
-//     if (descText) {
-//         // display.setFont(u8g2_font_profont11_tr);
-//         // uint8_t strWidth = display.getStrWidth(descText);
-//         // uint8_t x = (128 - strWidth) / 2;  // Centrowanie tekstu
-//         // display.drawStr(x, 62, descText);
-//         display.setFont(u8g2_font_profont11_tr);
-//         display.drawStr(52, 62, descText);
-//     }
-// }
-
 void drawMainDisplay() {
     display.setFont(u8g2_font_logisoso20_tf);
     char valueStr[10];
@@ -745,19 +563,40 @@ void drawMainDisplay() {
             case PRESSURE_SCREEN:
                 switch (currentSubScreen) {
                     case PRESSURE_BAR:
-                        sprintf(valueStr, "%4.1f", pressure_bar);
+                        display.setFont(u8g2_font_pxplusibmvga9_mf);
+                        char pressureFrontStr[16];
+                        char pressureRearStr[16];
+                        sprintf(pressureFrontStr, "P: %.2f", pressure_bar);
+                        sprintf(pressureRearStr, "T: %.2f", pressure_rear_bar);
+                        display.drawStr(60, 25, pressureFrontStr);
+                        display.drawStr(60, 50, pressureRearStr);
                         unitStr = "bar";
                         descText = "> Cisnienie";
+                        //return;
                         break;
                     case PRESSURE_VOLTAGE:
-                        sprintf(valueStr, "%4.2f", pressure_voltage);
+                        display.setFont(u8g2_font_pxplusibmvga9_mf);
+                        char voltageFrontStr[16];
+                        char voltageRearStr[16];
+                        sprintf(voltageFrontStr, "P: %.2f", pressure_voltage);
+                        sprintf(voltageRearStr, "T: %.2f", pressure_rear_voltage);
+                        display.drawStr(60, 25, voltageFrontStr);
+                        display.drawStr(60, 50, voltageRearStr);
                         unitStr = "V";
                         descText = "> Napiecie";
+                        //return;
                         break;
                     case PRESSURE_TEMP:
-                        sprintf(valueStr, "%4.1f", pressure_temp);
+                        display.setFont(u8g2_font_pxplusibmvga9_mf);
+                        char tempFrontStr[16];
+                        char tempRearStr[16];
+                        sprintf(tempFrontStr, "P: %.1f", pressure_temp);
+                        sprintf(tempRearStr, "T: %.1f", pressure_rear_temp);
+                        display.drawStr(60, 25, tempFrontStr);
+                        display.drawStr(60, 50, tempRearStr);
                         unitStr = "°C";
                         descText = "> Temperatura";
+                        //return;
                         break;
                 }
                 break;   
@@ -795,16 +634,23 @@ void drawMainDisplay() {
                 descText = "Moc";
                 break;
             case PRESSURE_SCREEN:
-                sprintf(valueStr, "%4.1f", pressure_bar);
+                display.setFont(u8g2_font_pxplusibmvga9_mf);
+                char pressureFrontStr[16];
+                char pressureRearStr[16];
+                sprintf(pressureFrontStr, "P: %.1f", pressure_bar);
+                sprintf(pressureRearStr, "T: %.1f", pressure_rear_bar );
+                display.drawStr(60, 25, pressureFrontStr);
+                display.drawStr(60, 50, pressureRearStr);
                 unitStr = "bar";
                 descText = "Kola";
+                //return;  // Zapobiegamy wykonaniu drawValueAndUnit
                 break;
             case USB_SCREEN:
                 display.setFont(u8g2_font_profont11_tr);
                 display.drawStr(78, 33, "USB");
                 display.drawStr(62, 43, usbEnabled ? "Wlaczone" : "Wylaczone");
                 descText = "Wyjscie USB";
-                //return;  // Wyjdź z funkcji, nie wywołuj drawValueAndUnit
+                return;
                 break; 
         }
     }
@@ -1208,6 +1054,12 @@ void loop() {
             battery_voltage = (battery_voltage <= 42.0) ? 50.0 : battery_voltage - 0.1;
             assistMode = (assistMode + 1) % 4;
             lastUpdate = currentTime;
+            pressure_bar = 2.0 + (random(20) / 10.0);
+            pressure_rear_bar = 2.0 + (random(20) / 10.0);
+            pressure_voltage = 0.5 + (random(20) / 100.0);
+            pressure_rear_voltage = 0.5 + (random(20) / 100.0);
+            pressure_temp = 20.0 + (random(100) / 10.0);
+            pressure_rear_temp = 20.0 + (random(100) / 10.0);
         }
     }
 }
