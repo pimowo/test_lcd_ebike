@@ -19,6 +19,7 @@ struct Settings {
   bool nightRearBlink;
   unsigned long blinkInterval;
 };
+
 // Typ głównych ekranów
 enum MainScreen {
     SPEED_SCREEN,    // Ekran a
@@ -98,6 +99,11 @@ int power_max_w = 0;
 float pressure_bar = 0;
 float pressure_voltage = 0;
 float pressure_temp = 0;
+
+// Zmienne dla obsługi podwójnego kliknięcia
+const unsigned long DOUBLE_CLICK_TIME = 250;  // Maksymalny czas między kliknięciami (250ms)
+unsigned long lastClickTime = 0;              // Czas ostatniego kliknięcia
+bool firstClick = false;                      // Flaga pierwszego kliknięcia
 
 Settings bikeSettings;
 Settings storedSettings;
@@ -670,13 +676,12 @@ void handleButtons() {
     bool upState = digitalRead(BTN_UP);
     bool downState = digitalRead(BTN_DOWN);
 
-    // Obsługa włączania/wyłączania wyświetlacza (>3s SET)
+    // Obsługa włączania/wyłączania wyświetlacza
     if (!displayActive) {
         if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
             if (!setPressStartTime) {
                 setPressStartTime = currentTime;
             } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
-                // Włączanie wyświetlacza
                 display.clearBuffer();
                 display.setFont(u8g2_font_pxplusibmvga9_mf);
                 display.drawStr(40, 32, "Witaj!");
@@ -735,19 +740,8 @@ void handleButtons() {
         if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
             if (!setPressStartTime) {
                 setPressStartTime = currentTime;
-            } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > LONG_PRESS_TIME) {
-                // Długie naciśnięcie SET (>1s)
-                if (inSubScreen) {
-                    // Wyjście z pod-ekranów
-                    inSubScreen = false;
-                } else if (hasSubScreens(currentMainScreen)) {
-                    // Wejście do pod-ekranów
-                    inSubScreen = true;
-                    currentSubScreen = 0;
-                }
-                setLongPressExecuted = true;
-            } else if ((currentTime - setPressStartTime) > SET_LONG_PRESS) {
-                // Bardzo długie naciśnięcie SET (>3s)
+            } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
+                // Bardzo długie naciśnięcie SET (>3s) - wyłączenie wyświetlacza
                 display.clearBuffer();
                 display.setFont(u8g2_font_pxplusibmvga9_mf);
                 display.drawStr(20, 32, "Do widzenia :)");
@@ -756,20 +750,45 @@ void handleButtons() {
                 setLongPressExecuted = true;
             }
         } else if (setState && setPressStartTime) {
-            if (!setLongPressExecuted && (currentTime - setPressStartTime) < LONG_PRESS_TIME) {
-                // Krótkie naciśnięcie SET
-                if (inSubScreen) {
-                    // Przełączanie pod-ekranów
-                    currentSubScreen = (currentSubScreen + 1) % getSubScreenCount(currentMainScreen);
+            // Puszczenie przycisku SET
+            unsigned long pressDuration = currentTime - setPressStartTime;
+            
+            if (!setLongPressExecuted && pressDuration < LONG_PRESS_TIME) {
+                // Krótkie naciśnięcie - obsługa pojedynczego/podwójnego kliknięcia
+                if (firstClick && (currentTime - lastClickTime) < DOUBLE_CLICK_TIME) {
+                    // Podwójne kliknięcie - wejście/wyjście z pod-ekranów
+                    if (inSubScreen) {
+                        inSubScreen = false;
+                    } else if (hasSubScreens(currentMainScreen)) {
+                        inSubScreen = true;
+                        currentSubScreen = 0;
+                    }
+                    firstClick = false;
                 } else {
-                    // Przełączanie głównych ekranów
-                    currentMainScreen = (MainScreen)((currentMainScreen + 1) % MAIN_SCREEN_COUNT);
+                    // Pierwsze kliknięcie lub po czasie na podwójne
+                    if (!firstClick) {
+                        firstClick = true;
+                        lastClickTime = currentTime;
+                    } else if ((currentTime - lastClickTime) >= DOUBLE_CLICK_TIME) {
+                        // Pojedyncze kliknięcie - przełączanie ekranów
+                        if (inSubScreen) {
+                            currentSubScreen = (currentSubScreen + 1) % getSubScreenCount(currentMainScreen);
+                        } else {
+                            currentMainScreen = (MainScreen)((currentMainScreen + 1) % MAIN_SCREEN_COUNT);
+                        }
+                        firstClick = false;
+                    }
                 }
             }
             setPressStartTime = 0;
             setLongPressExecuted = false;
             lastDebounceTime = currentTime;
         }
+    }
+
+    // Reset flagi pierwszego kliknięcia po przekroczeniu czasu
+    if (firstClick && (currentTime - lastClickTime) >= DOUBLE_CLICK_TIME) {
+        firstClick = false;
     }
 
     // Obsługa komunikatów powitalnych/pożegnalnych
