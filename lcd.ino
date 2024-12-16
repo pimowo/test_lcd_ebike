@@ -211,7 +211,7 @@ void loadSettingsFromEEPROM() {
     bikeSettings.batteryCapacity = 10.0;     // Domyślna pojemność baterii
     bikeSettings.daySetting = 0;
     bikeSettings.nightSetting = 0;
-    bikeSettings.dayRearBlink = false;h
+    bikeSettings.dayRearBlink = false;
     bikeSettings.nightRearBlink = false;
     bikeSettings.blinkInterval = 500;
   }
