@@ -106,6 +106,10 @@ bool inSubScreen = false;
 bool displayActive = false;
 bool showingWelcome = false;
 
+#define PRESSURE_LEFT_MARGIN 60
+#define PRESSURE_TOP_LINE 25
+#define PRESSURE_BOTTOM_LINE 50
+
 // --- Zmienne pomiarowe ---
 float speed_kmh = 0;
 int cadence_rpm = 0;
@@ -568,8 +572,8 @@ void drawMainDisplay() {
                         char pressureRearStr[16];
                         sprintf(pressureFrontStr, "P: %.2f", pressure_bar);
                         sprintf(pressureRearStr, "T: %.2f", pressure_rear_bar);
-                        display.drawStr(60, 25, pressureFrontStr);
-                        display.drawStr(60, 50, pressureRearStr);
+                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_TOP_LINE , pressureFrontStr);
+                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE , pressureRearStr);
                         unitStr = "bar";
                         descText = "> Cisnienie";
                         //return;
@@ -580,8 +584,8 @@ void drawMainDisplay() {
                         char voltageRearStr[16];
                         sprintf(voltageFrontStr, "P: %.2f", pressure_voltage);
                         sprintf(voltageRearStr, "T: %.2f", pressure_rear_voltage);
-                        display.drawStr(60, 25, voltageFrontStr);
-                        display.drawStr(60, 50, voltageRearStr);
+                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_TOP_LINE , voltageFrontStr);
+                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE , voltageRearStr);
                         unitStr = "V";
                         descText = "> Napiecie";
                         //return;
@@ -592,8 +596,8 @@ void drawMainDisplay() {
                         char tempRearStr[16];
                         sprintf(tempFrontStr, "P: %.1f", pressure_temp);
                         sprintf(tempRearStr, "T: %.1f", pressure_rear_temp);
-                        display.drawStr(60, 25, tempFrontStr);
-                        display.drawStr(60, 50, tempRearStr);
+                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_TOP_LINE , tempFrontStr);
+                        display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE , tempRearStr);
                         unitStr = "°C";
                         descText = "> Temperatura";
                         //return;
@@ -639,8 +643,8 @@ void drawMainDisplay() {
                 char pressureRearStr[16];
                 sprintf(pressureFrontStr, "P: %.1f", pressure_bar);
                 sprintf(pressureRearStr, "T: %.1f", pressure_rear_bar );
-                display.drawStr(60, 25, pressureFrontStr);
-                display.drawStr(60, 50, pressureRearStr);
+                display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_TOP_LINE , pressureFrontStr);
+                display.drawStr(PRESSURE_LEFT_MARGIN, PRESSURE_BOTTOM_LINE , pressureRearStr);
                 unitStr = "bar";
                 descText = "Kola";
                 //return;  // Zapobiegamy wykonaniu drawValueAndUnit
