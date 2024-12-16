@@ -29,8 +29,8 @@ const unsigned long DEBOUNCE_DELAY = 25;
 const unsigned long BUTTON_DELAY = 200;
 const unsigned long LONG_PRESS_TIME = 1000;
 const unsigned long DOUBLE_CLICK_TIME = 300;
-const unsigned long GOODBYE_DELAY = 5000;
-const unsigned long SET_LONG_PRESS = 3000;
+const unsigned long GOODBYE_DELAY = 3000;
+const unsigned long SET_LONG_PRESS = 2000;
 const unsigned long TEMP_REQUEST_INTERVAL = 1000;
 const unsigned long DS18B20_CONVERSION_DELAY_MS = 750;
 
@@ -759,8 +759,6 @@ void drawMainDisplay() {
                         unitStr = "°C";
                         descText = "> Temperatura";
                         break;
-                    case USB_SCREEN:
-                        break;
                 }
                 break;   
         }
@@ -806,7 +804,7 @@ void drawMainDisplay() {
                 display.drawStr(78, 33, "USB");
                 display.drawStr(62, 43, usbEnabled ? "Wlaczone" : "Wylaczone");
                 descText = "Wyjscie USB";
-                return;  // Wyjdź z funkcji, nie wywołuj drawValueAndUnit
+                //return;  // Wyjdź z funkcji, nie wywołuj drawValueAndUnit
                 break; 
         }
     }
@@ -815,7 +813,7 @@ void drawMainDisplay() {
     if (currentMainScreen != USB_SCREEN) {
       drawValueAndUnit(valueStr, unitStr);
     }
-    
+
     display.setFont(u8g2_font_profont11_tr);
     display.drawStr(52, 62, descText);
 }
