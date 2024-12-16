@@ -132,12 +132,10 @@ bool conversionRequested = false;
 const unsigned long DS18B20_CONVERSION_DELAY_MS = 750;  // Czas konwersji DS18B20
 unsigned long ds18b20RequestTime;
 
-bool inSubScreen = false;
 int subScreen = 0;
 int currentScreen = 0;
 bool longPressHandled = false;
 const int NUM_SCREENS = 7; // Liczba głównych ekranów, dostosuj do swoich potrzeb
-
 
 // Dodaj obiekt RTC
 RTC_DS3231 rtc;
@@ -158,20 +156,6 @@ bool showingWelcome = false; // Flaga dla wyświetlania powitania
 
 // Dodaj na początku pliku z innymi zmiennymi globalnymi
 bool temperatureReady = false;
-
-// Typ wyświetlanego parametru
-enum DisplayMode {
-    SPEED,      // Prędkość km/h
-    TRIP,       // Licznik dzienny km
-    ODOMETER,   // Przebieg całkowity km
-    TEMP,       // Temperatura °C
-    POWER,      // Moc W
-    ENERGY,     // Zużycie energii Wh
-    BATT_CAP    // Pojemność baterii Ah
-};
-
-// Zmienne globalne dla wyświetlania
-DisplayMode currentDisplay = SPEED;
 int assistLevel = 3;
 bool assistLevelAsText = false;
 
@@ -278,14 +262,14 @@ public:
 
 TemperatureSensor tempSensor;
 
-int getSubScreenCount(int screen) {
-    switch (screen) {
-        case 0: return 2; // Przykład: ekran 0 ma 2 pod-ekrany
-        case 1: return 3; // Przykład: ekran 1 ma 3 pod-ekrany
-        // Dodaj pozostałe ekrany i ich liczby pod-ekranów
-        default: return 0;
-    }
-}
+// int getSubScreenCount(int screen) {
+//     switch (screen) {
+//         case 0: return 2; // Przykład: ekran 0 ma 2 pod-ekrany
+//         case 1: return 3; // Przykład: ekran 1 ma 3 pod-ekrany
+//         // Dodaj pozostałe ekrany i ich liczby pod-ekranów
+//         default: return 0;
+//     }
+// }
 
 void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
   // Twoja funkcja obsługi powiadomień
@@ -825,28 +809,6 @@ int getSubScreenCount(MainScreen screen) {
     }
 }
 
-void handleButton() {
-    if (inSubScreen) {
-        // Przełączanie pod-ekranów
-        subScreen = (subScreen + 1) % getSubScreenCount(currentScreen);
-    } else {
-        // Przełączanie głównych ekranów
-        currentScreen = (currentScreen + 1) % NUM_SCREENS;
-    }
-    longPressHandled = false; // Reset flagi długiego naciśnięcia
-}
-
-void handleLongPress() {
-    if (inSubScreen) {
-        // Wyjście z pod-ekranów
-        inSubScreen = false;
-    } else if (getSubScreenCount(currentScreen) > 0) {
-        // Wejście do pod-ekranów
-        inSubScreen = true;
-        subScreen = 0;
-    }
-}
-
 void goToSleep() {
     // Wyłącz wszystkie LEDy
     digitalWrite(FrontDayPin, LOW);
@@ -1023,7 +985,22 @@ void loop() {
         display.sendBuffer();
         handleTemperature();
 
-        if (currentTime - lastUpdate >= updateInterval) {  
+        if (currentTime - lastUpdate >= updateInterval) { 
+              speed_kmh = (speed_kmh >= 35.0) ? 0.0 : speed_kmh + 0.1;
+              cadence_rpm = random(60, 90);
+              temp_controller = 25.0 + random(15);
+              temp_motor = 30.0 + random(20);
+              range_km = 50.0 - (random(20) / 10.0);
+              tripDistance += 0.1;
+              totalDistance += 0.1;
+              power = 100 + random(300);
+              power_avg_w = power * 0.8;
+              power_max_w = power * 1.2;
+              battery_current = random(50, 150) / 10.0;
+              battery_capacity_wh = batteryCapacity * batteryVoltage;
+              pressure_bar = 2.0 + (random(20) / 10.0);
+              pressure_voltage = 0.5 + (random(20) / 100.0);
+              pressure_temp = 20.0 + (random(100) / 10.0); 
             speed = (speed >= 35.0) ? 0.0 : speed + 0.1;
             tripDistance += 0.1;
             totalDistance += 0.1;
