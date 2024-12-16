@@ -717,6 +717,12 @@ void loop() {
         lastButtonCheck = currentTime;
     }
 
+    // Sprawdź, czy wyświetla się komunikat "Witaj!" i wyłącz go po 3 sekundach
+    if (showingWelcome && (currentTime - messageStartTime > 3000)) {
+        showingWelcome = false;
+        messageStartTime = 0;
+    }
+
     // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla komunikatów
     if (displayActive && messageStartTime == 0) {
         display.clearBuffer();
