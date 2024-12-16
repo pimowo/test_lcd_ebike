@@ -3,6 +3,32 @@
 #include <RTClib.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <EEPROM.h>
+#include <EEPROM.h>
+#include <BLEDevice.h>
+#include <BLEClient.h>
+#include <BLEUtils.h>
+#include <BLEServer.h>
+
+// Deklaracja brakujących zmiennych
+struct Settings {
+  int wheelCircumference;
+  float batteryCapacity;
+  int daySetting;
+  int nightSetting;
+  bool dayRearBlink;
+  bool nightRearBlink;
+  unsigned long blinkInterval;
+};
+
+Settings bikeSettings;
+Settings storedSettings;
+
+BLEClient* bleClient;
+BLEAddress bmsMacAddress("a5:c2:37:05:8b:86");
+BLERemoteService* bleService;
+BLERemoteCharacteristic* bleCharacteristicTx;
+BLERemoteCharacteristic* bleCharacteristicRx;
 
 // Definicje pinów
 // Przyciski
@@ -166,6 +192,10 @@ public:
 };
 
 TemperatureSensor tempSensor;
+
+void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
+  // Twoja funkcja obsługi powiadomień
+}
 
 // --- Wczytywanie ustawień z EEPROM ---
 void loadSettingsFromEEPROM() {
