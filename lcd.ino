@@ -1,3 +1,4 @@
+// --- Biblioteki ---
 #include <Wire.h>
 #include <U8g2lib.h>
 #include <RTClib.h>
@@ -9,7 +10,31 @@
 #include <BLEUtils.h>
 #include <BLEServer.h>
 
-// Deklaracja brakujących zmiennych
+// --- Definicje pinów ---
+// Przyciski
+#define BTN_UP 13
+#define BTN_DOWN 14
+#define BTN_SET 12
+// Światła
+#define FrontDayPin 5  // światła dzienne
+#define FrontPin 18    // światła zwykłe
+#define RealPin 19     // tylne światło
+// Ładowarka USB
+#define UsbPin 32      // ładowarka USB
+// Czujnik temperatury powietrza
+#define ONE_WIRE_BUS 15  // Pin do którego podłączony jest DS18B20
+
+// --- Stałe czasowe ---
+const unsigned long DEBOUNCE_DELAY = 25;
+const unsigned long BUTTON_DELAY = 200;
+const unsigned long LONG_PRESS_TIME = 1000;
+const unsigned long DOUBLE_CLICK_TIME = 300;
+const unsigned long GOODBYE_DELAY = 5000;
+const unsigned long SET_LONG_PRESS = 3000;
+const unsigned long TEMP_REQUEST_INTERVAL = 1000;
+const unsigned long DS18B20_CONVERSION_DELAY_MS = 750;
+
+// --- Struktury i enumy ---
 struct Settings {
   int wheelCircumference;
   float batteryCapacity;
@@ -20,7 +45,6 @@ struct Settings {
   unsigned long blinkInterval;
 };
 
-// Typ głównych ekranów
 enum MainScreen {
     SPEED_SCREEN,    // Ekran a
     TEMP_SCREEN,     // Ekran b
@@ -31,7 +55,6 @@ enum MainScreen {
     MAIN_SCREEN_COUNT
 };
 
-// Typy pod-ekranów dla każdego głównego ekranu
 enum SpeedSubScreen {
     SPEED_KMH,
     CADENCE_RPM,
@@ -75,11 +98,14 @@ enum PressureSubScreen {
     PRESSURE_SUB_COUNT
 };
 
+// --- Zmienne stanu ekranu ---
 MainScreen currentMainScreen = SPEED_SCREEN;
 int currentSubScreen = 0;
 bool inSubScreen = false;
+bool displayActive = false;
+bool showingWelcome = false;
 
-// Zmienne do przechowywania danych pomiarowych
+// --- Zmienne pomiarowe ---
 float speed_kmh = 0;
 int cadence_rpm = 0;
 float temp_air = 0;
@@ -100,93 +126,49 @@ float pressure_bar = 0;
 float pressure_voltage = 0;
 float pressure_temp = 0;
 
-// Zmienne dla obsługi podwójnego kliknięcia
-const unsigned long DOUBLE_CLICK_TIME = 300;  // Maksymalny czas między kliknięciami (250ms)
-unsigned long lastClickTime = 0;              // Czas ostatniego kliknięcia
-bool firstClick = false;                      // Flaga pierwszego kliknięcia
+// --- Zmienne dla czujnika temperatury ---
+#define TEMP_ERROR -999.0
+float currentTemp = DEVICE_DISCONNECTED_C;
+bool temperatureReady = false;
+bool conversionRequested = false;
+unsigned long lastTempRequest = 0;
+unsigned long ds18b20RequestTime;
 
+// --- Zmienne dla przycisków ---
+unsigned long lastClickTime = 0;
+unsigned long lastButtonPress = 0;
+unsigned long lastDebounceTime = 0;
+unsigned long upPressStartTime = 0;
+unsigned long downPressStartTime = 0;
+unsigned long setPressStartTime = 0;
+unsigned long messageStartTime = 0;
+bool firstClick = false;
+bool upLongPressExecuted = false;
+bool downLongPressExecuted = false;
+bool setLongPressExecuted = false;
+
+// --- Zmienne konfiguracyjne ---
+int assistLevel = 3;
+bool assistLevelAsText = false;
+int lightMode = 0;    // 0=off, 1=dzień, 2=noc
+int assistMode = 0;   // 0=PAS, 1=STOP, 2=GAZ, 3=P+G
+
+// --- Obiekty ---
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
+RTC_DS3231 rtc;
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
 Settings bikeSettings;
 Settings storedSettings;
 
+// --- Obiekty BLE ---
 BLEClient* bleClient;
 BLEAddress bmsMacAddress("a5:c2:37:05:8b:86");
 BLERemoteService* bleService;
 BLERemoteCharacteristic* bleCharacteristicTx;
 BLERemoteCharacteristic* bleCharacteristicRx;
 
-// Definicje pinów
-// Przyciski
-#define BTN_UP 13
-#define BTN_DOWN 14
-#define BTN_SET 12
-// Światła
-#define FrontDayPin 5  // światła dzienne
-#define FrontPin 18    // światła zwykłe
-#define RealPin 19     // tylne światło
-// Ładowarka USB
-#define UsbPin 32      // ładowarka USB
-// Czujnik temperatury powietrza
-#define ONE_WIRE_BUS 15  // Pin do którego podłączony jest DS18B20
-
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensors(&oneWire);
-unsigned long lastTempRequest = 0;
-const unsigned long TEMP_REQUEST_INTERVAL = 1000;
-float currentTemp = DEVICE_DISCONNECTED_C; // Początkowa wartość
-bool conversionRequested = false;
-#define TEMP_ERROR -999.0
-const unsigned long DS18B20_CONVERSION_DELAY_MS = 750;  // Czas konwersji DS18B20
-unsigned long ds18b20RequestTime;
-
-int subScreen = 0;
-int currentScreen = 0;
-bool longPressHandled = false;
-const int NUM_SCREENS = 7; // Liczba głównych ekranów, dostosuj do swoich potrzeb
-
-// Dodaj obiekt RTC
-RTC_DS3231 rtc;
-
-// Inicjalizacja wyświetlacza
-U8G2_SSD1306_128X64_NONAME_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
-
-// Stałe czasowe dla przycisków
-const unsigned long DEBOUNCE_DELAY = 25;
-const unsigned long BUTTON_DELAY = 200;
-const unsigned long LONG_PRESS_TIME = 1000;
-
-bool displayActive = false;
-const unsigned long GOODBYE_DELAY = 5000; // 5 sekund na komunikaty
-const unsigned long SET_LONG_PRESS = 3000; // 3 sekundy na długie naciśnięcie SET
-unsigned long messageStartTime = 0; // Używane zarówno dla powitania jak i pożegnania
-bool showingWelcome = false; // Flaga dla wyświetlania powitania
-
-// Dodaj na początku pliku z innymi zmiennymi globalnymi
-bool temperatureReady = false;
-int assistLevel = 3;
-bool assistLevelAsText = false;
-
-// Zmienne dla obsługi przycisków
-unsigned long lastButtonPress = 0;
-unsigned long lastDebounceTime = 0;
-unsigned long upPressStartTime = 0;
-unsigned long downPressStartTime = 0;
-unsigned long setPressStartTime = 0;
-bool upLongPressExecuted = false;
-bool downLongPressExecuted = false;
-bool setLongPressExecuted = false;
-
-// Symulowane dane pomiarowe
-float speed = 25.7;
-float tripDistance = 1.5;    // km
-float totalDistance = 123.4; // km
-int power = 250;            // W
-float energyConsumption = 12.4; // Wh
-float batteryCapacity = 14.5;   // Ah
-int batteryPercent = 75;
-float batteryVoltage = 47.8;
-int lightMode = 0; // 0=brak, 1=Dzień, 2=Noc
-int assistMode = 0; // 0=PAS, 1=STOP, 2=GAZ, 3=P+G
-
+// --- Klasy pomocnicze ---
 class TimeoutHandler {
 private:
     uint32_t startTime;
@@ -219,8 +201,6 @@ public:
         return (millis() - startTime);
     }
 };
-
-bool isValidTemperature(float temp);
 
 class TemperatureSensor {
 private:
@@ -266,52 +246,10 @@ public:
     }
 };
 
-TemperatureSensor tempSensor;
-
-// int getSubScreenCount(int screen) {
-//     switch (screen) {
-//         case 0: return 2; // Przykład: ekran 0 ma 2 pod-ekrany
-//         case 1: return 3; // Przykład: ekran 1 ma 3 pod-ekrany
-//         // Dodaj pozostałe ekrany i ich liczby pod-ekranów
-//         default: return 0;
-//     }
-// }
-
+// --- Deklaracje funkcji ---
+// Funkcje BLE
 void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
   // Twoja funkcja obsługi powiadomień
-}
-
-// --- Wczytywanie ustawień z EEPROM ---
-void loadSettingsFromEEPROM() {
-  // Wczytanie ustawień z EEPROM
-  EEPROM.get(0, bikeSettings);
-
-  // Skopiowanie aktualnych ustawień do storedSettings do późniejszego porównania
-  storedSettings = bikeSettings;
-
-  // Możesz dodać weryfikację wczytanych danych
-  if (bikeSettings.wheelCircumference == 0) {
-    bikeSettings.wheelCircumference = 2210;  // Domyślny obwód koła
-    bikeSettings.batteryCapacity = 10.0;     // Domyślna pojemność baterii
-    bikeSettings.daySetting = 0;
-    bikeSettings.nightSetting = 0;
-    bikeSettings.dayRearBlink = false;
-    bikeSettings.nightRearBlink = false;
-    bikeSettings.blinkInterval = 500;
-  }
-}
-
-// --- Funkcja zapisująca ustawienia do EEPROM ---
-void saveSettingsToEEPROM() {
-  // Porównaj aktualne ustawienia z poprzednio wczytanymi
-  if (memcmp(&storedSettings, &bikeSettings, sizeof(bikeSettings)) != 0) {
-    // Jeśli ustawienia się zmieniły, zapisz je do EEPROM
-    EEPROM.put(0, bikeSettings);
-    EEPROM.commit();
-
-    // Zaktualizuj storedSettings po zapisie
-    storedSettings = bikeSettings;
-  }
 }
 
 // --- Połączenie z BMS ---
@@ -375,22 +313,41 @@ void connectToBms() {
   }
 }
 
-void setLights() {
-    if (lightMode == 0) {
-        digitalWrite(FrontDayPin, LOW);
-        digitalWrite(FrontPin, LOW);
-        digitalWrite(RealPin, LOW);
-    } else if (lightMode == 1) {
-        digitalWrite(FrontDayPin, HIGH);
-        digitalWrite(FrontPin, LOW);
-        digitalWrite(RealPin, HIGH);
-    } else if (lightMode == 2) {
-        digitalWrite(FrontDayPin, LOW);
-        digitalWrite(FrontPin, HIGH);
-        digitalWrite(RealPin, HIGH);
-    }
+// Funkcje ustawień
+// Wczytywanie ustawień z EEPROM
+void loadSettingsFromEEPROM() {
+  // Wczytanie ustawień z EEPROM
+  EEPROM.get(0, bikeSettings);
+
+  // Skopiowanie aktualnych ustawień do storedSettings do późniejszego porównania
+  storedSettings = bikeSettings;
+
+  // Możesz dodać weryfikację wczytanych danych
+  if (bikeSettings.wheelCircumference == 0) {
+    bikeSettings.wheelCircumference = 2210;  // Domyślny obwód koła
+    bikeSettings.batteryCapacity = 10.0;     // Domyślna pojemność baterii
+    bikeSettings.daySetting = 0;
+    bikeSettings.nightSetting = 0;
+    bikeSettings.dayRearBlink = false;
+    bikeSettings.nightRearBlink = false;
+    bikeSettings.blinkInterval = 500;
+  }
 }
 
+// --- Funkcja zapisująca ustawienia do EEPROM ---
+void saveSettingsToEEPROM() {
+  // Porównaj aktualne ustawienia z poprzednio wczytanymi
+  if (memcmp(&storedSettings, &bikeSettings, sizeof(bikeSettings)) != 0) {
+    // Jeśli ustawienia się zmieniły, zapisz je do EEPROM
+    EEPROM.put(0, bikeSettings);
+    EEPROM.commit();
+
+    // Zaktualizuj storedSettings po zapisie
+    storedSettings = bikeSettings;
+  }
+}
+
+// Funkcje wyświetlacza
 void drawHorizontalLine() {
   display.drawHLine(4, 17, 122);
 }
@@ -670,6 +627,7 @@ void drawMainDisplay() {
     display.drawStr(52, 62, descText);
 }
 
+// Funkcje obsługi przycisków i menu
 void handleButtons() {
     unsigned long currentTime = millis();
     bool setState = digitalRead(BTN_SET);
@@ -835,6 +793,7 @@ int getSubScreenCount(MainScreen screen) {
     }
 }
 
+// Funkcje zarządzania energią
 void goToSleep() {
     // Wyłącz wszystkie LEDy
     digitalWrite(FrontDayPin, LOW);
@@ -856,6 +815,23 @@ void goToSleep() {
     esp_deep_sleep_start();
 }
 
+void setLights() {
+    if (lightMode == 0) {
+        digitalWrite(FrontDayPin, LOW);
+        digitalWrite(FrontPin, LOW);
+        digitalWrite(RealPin, LOW);
+    } else if (lightMode == 1) {
+        digitalWrite(FrontDayPin, HIGH);
+        digitalWrite(FrontPin, LOW);
+        digitalWrite(RealPin, HIGH);
+    } else if (lightMode == 2) {
+        digitalWrite(FrontDayPin, LOW);
+        digitalWrite(FrontPin, HIGH);
+        digitalWrite(RealPin, HIGH);
+    }
+}
+
+// Funkcje czujnika temperatury
 void initializeDS18B20() {
     sensors.begin();
 }
@@ -900,6 +876,7 @@ void handleTemperature() {
     }
 }
 
+// Główne funkcje programu
 void setup() {
     // Sprawdź przyczynę wybudzenia
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
