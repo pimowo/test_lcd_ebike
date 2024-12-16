@@ -130,7 +130,7 @@ private:
 
 public:
     TemperatureSensor() : 
-        conversionTimeout(DS18B20_CONVERSION_DELAY_MS),
+        conversionTimeout(TEMP_CONVERSION_TIME),
         readTimeout(1000),  // 1 sekunda na odczyt
         conversionInProgress(false) {}
 
@@ -333,11 +333,6 @@ void drawMainDisplay() {
 
     display.drawStr(52, 62, descText);
 }
-  
-  //int16_t width = display.getStrWidth(descText);
-  //display.drawStr(100 - width, 63, descText);
-  display.drawStr(52, 62, descText);
-}
 
 void handleButtons() {
     unsigned long currentTime = millis();
@@ -464,6 +459,35 @@ void goToSleep() {
     esp_deep_sleep_start();
 }
 
+void initializeDS18B20() {
+    sensors.begin();
+}
+
+void requestGroundTemperature() {
+    sensors.requestTemperatures();
+    ds18b20RequestTime = millis();
+}
+
+bool isGroundTemperatureReady() {
+    return millis() - ds18b20RequestTime >= DS18B20_CONVERSION_DELAY_MS;
+}
+
+bool isValidTemperature(float temp) {
+    return (temp >= -50.0 && temp <= 100.0);
+}
+
+float readGroundTemperature() {
+    if (isGroundTemperatureReady()) {
+        float temperature = sensors.getTempCByIndex(0);
+        if (isValidTemperature(temperature)) {
+            return temperature;
+        } else {
+            return -999.0;
+        }
+    }
+    return -999.0;
+}
+
 void handleTemperature() {
     unsigned long currentMillis = millis();
     
@@ -479,7 +503,6 @@ void handleTemperature() {
     }
 }
 
-
 void setup() {
     // Sprawdź przyczynę wybudzenia
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -489,7 +512,7 @@ void setup() {
     Wire.begin();
 
     // Inicjalizacja DS18B20
-    sensors.begin();
+    initializeDS18B20();
     sensors.setWaitForConversion(false);  // Ważne - tryb nieblokujący
     
     sensors.setResolution(12);  // Ustaw najwyższą rozdzielczość
@@ -532,7 +555,6 @@ void setup() {
     digitalWrite(UsbPin, LOW);
     
     // Inicjalizacja I2C i wyświetlacza
-    //Wire.begin(I2C_SDA, I2C_SCL);
     display.begin();
     display.enableUTF8Print();
     display.setFontDirection(0);
@@ -605,40 +627,3 @@ void loop() {
         }
     }
 }
-
-/*
-GPIO | Input	| Output     | Notes
------|--------|------------|---------
-0	   | PULLUP | OK	       | wysyła sygnał PWM przy rozruchu, musi być NISKI, aby przejść do trybu migania
-1	   | TX ESP	| OK	       | debugowanie danych wyjściowych podczas rozruchu
-2	   | OK	    | OK	       | podłączony do wbudowanej diody LED, musi pozostać pływający lub NISKI, aby przejść do trybu migania
-3	   | OK	    | RX         | pin WYSOKI przy rozruchu
-4	   | OK	    | OK	       |
-5	   | OK   	| Dzień      | wyprowadza sygnał PWM przy rozruchu, pin spinający
-6	   | x	    | x	         | connected to the integrated SPI flash
-7	   | x	    | x	         | connected to the integrated SPI flash
-8	   | x      | x	         | connected to the integrated SPI flash
-9	   | x      | x	         | connected to the integrated SPI flash
-10	 | x	    | x	         | connected to the integrated SPI flash
-11	 | x	    | x	         | connected to the integrated SPI flash
-12	 | SET    | OK	       | boot fails if pulled high, strapping pin
-13	 | UP	    | OK	       |
-14	 | DOWN   | OK	       | outputs PWM signal at boot
-15	 | TEMP   | OK	       | outputs PWM signal at boot, strapping pin
-16	 | OK	    | OK         |	
-17	 | OK	    | OK         |	
-18	 | OK	    | Przód      |
-19	 | OK	    | Tył        |	
-21	 | SDA    | OK         |	
-22	 | OK	    | SCL        |	
-23	 | OK	    | OK         |	
-25	 | OK	    | OK	       |
-26	 | OK	    | OK	       |
-27	 | OK	    | OK	       |
-32	 | OK	    | USB        |	
-33	 | OK	    | OK         |	
-34	 | OK		  | input only |  
-35	 | OK		  | input only |
-36	 | OK		  | input only |
-39	 | OK		  | input only |
-*/
