@@ -53,6 +53,13 @@ bool conversionRequested = false;
 const unsigned long DS18B20_CONVERSION_DELAY_MS = 750;  // Czas konwersji DS18B20
 unsigned long ds18b20RequestTime;
 
+bool inSubScreen = false;
+int subScreen = 0;
+int currentScreen = 0;
+bool longPressHandled = false;
+const int NUM_SCREENS = 7; // Liczba głównych ekranów, dostosuj do swoich potrzeb
+
+
 // Dodaj obiekt RTC
 RTC_DS3231 rtc;
 
@@ -191,6 +198,15 @@ public:
 };
 
 TemperatureSensor tempSensor;
+
+int getSubScreenCount(int screen) {
+    switch (screen) {
+        case 0: return 2; // Przykład: ekran 0 ma 2 pod-ekrany
+        case 1: return 3; // Przykład: ekran 1 ma 3 pod-ekrany
+        // Dodaj pozostałe ekrany i ich liczby pod-ekranów
+        default: return 0;
+    }
+}
 
 void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
   // Twoja funkcja obsługi powiadomień
@@ -517,17 +533,21 @@ void handleButtons() {
 
 void handleButton() {
     if (inSubScreen) {
+        // Przełączanie pod-ekranów
         subScreen = (subScreen + 1) % getSubScreenCount(currentScreen);
     } else {
+        // Przełączanie głównych ekranów
         currentScreen = (currentScreen + 1) % NUM_SCREENS;
     }
-    longPressHandled = false;
+    longPressHandled = false; // Reset flagi długiego naciśnięcia
 }
 
 void handleLongPress() {
     if (inSubScreen) {
+        // Wyjście z pod-ekranów
         inSubScreen = false;
     } else if (getSubScreenCount(currentScreen) > 0) {
+        // Wejście do pod-ekranów
         inSubScreen = true;
         subScreen = 0;
     }
