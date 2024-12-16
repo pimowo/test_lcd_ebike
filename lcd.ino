@@ -46,13 +46,14 @@ struct Settings {
 };
 
 enum MainScreen {
-    SPEED_SCREEN,    // Ekran a
-    TEMP_SCREEN,     // Ekran b
-    RANGE_SCREEN,    // Ekran c
-    BATTERY_SCREEN,  // Ekran d
-    POWER_SCREEN,    // Ekran e
-    PRESSURE_SCREEN, // Ekran f
-    MAIN_SCREEN_COUNT
+    SPEED_SCREEN,     // Ekran prędkości
+    TEMP_SCREEN,      // Ekran temperatur
+    RANGE_SCREEN,     // Ekran zasięgu
+    BATTERY_SCREEN,   // Ekran baterii
+    POWER_SCREEN,     // Ekran mocy
+    PRESSURE_SCREEN,  // Ekran ciśnienia
+    USB_SCREEN,       // Ekran sterowania USB
+    MAIN_SCREEN_COUNT // Liczba głównych ekranów
 };
 
 enum SpeedSubScreen {
@@ -152,6 +153,7 @@ int assistLevel = 3;
 bool assistLevelAsText = false;
 int lightMode = 0;    // 0=off, 1=dzień, 2=noc
 int assistMode = 0;   // 0=PAS, 1=STOP, 2=GAZ, 3=P+G
+bool usbEnabled = false;  // Stan wyjścia USB
 
 // --- Obiekty ---
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
@@ -251,14 +253,28 @@ private:
     static constexpr float INVALID_TEMP = -999.0f;
     static constexpr float MIN_VALID_TEMP = -50.0f;
     static constexpr float MAX_VALID_TEMP = 100.0f;
+    bool conversionRequested = false;
+    unsigned long lastRequestTime = 0;
     
 public:
+    void requestTemperature() {
+        if (millis() - lastRequestTime >= TEMP_REQUEST_INTERVAL) {
+            sensors.requestTemperatures();
+            conversionRequested = true;
+            lastRequestTime = millis();
+        }
+    }
+    
     bool isValidTemperature(float temp) {
         return temp >= MIN_VALID_TEMP && temp <= MAX_VALID_TEMP;
     }
     
     float readTemperature() {
         if (!conversionRequested) return INVALID_TEMP;
+        
+        if (millis() - lastRequestTime < DS18B20_CONVERSION_DELAY_MS) {
+            return INVALID_TEMP; // Konwersja jeszcze trwa
+        }
         
         float temp = sensors.getTempCByIndex(0);
         conversionRequested = false;
@@ -602,7 +618,7 @@ void drawMainDisplay() {
                         descText = "> Temperatura";
                         break;
                 }
-                break;
+                break;   
         }
     } else {
         // Wyświetlanie głównych ekranów
@@ -639,8 +655,14 @@ void drawMainDisplay() {
             case PRESSURE_SCREEN:
                 sprintf(valueStr, "%4.1f", pressure_bar);
                 unitStr = "bar";
-                descText = "Cisnienie";
+                descText = "Kola";
                 break;
+            case USB_SCREEN:
+                display.setFont(u8g2_font_profont17_tr); // Użyj większej czcionki
+                display.drawStr(52, 35, "USB");
+                display.drawStr(25, 55, usbEnabled ? "Wlaczone" : "Wylaczone");
+                descText = "Wyjscie USB";
+                break; 
         }
     }
 
@@ -650,6 +672,145 @@ void drawMainDisplay() {
 }
 
 // Funkcje obsługi przycisków i menu
+// void handleButtons() {
+//     unsigned long currentTime = millis();
+//     bool setState = digitalRead(BTN_SET);
+//     bool upState = digitalRead(BTN_UP);
+//     bool downState = digitalRead(BTN_DOWN);
+
+//     // Obsługa włączania/wyłączania wyświetlacza
+//     if (!displayActive) {
+//         if (!setState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+//             if (!setPressStartTime) {
+//                 setPressStartTime = currentTime;
+//             } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
+//                 display.clearBuffer();
+//                 display.setFont(u8g2_font_pxplusibmvga9_mf);
+//                 display.drawStr(40, 32, "Witaj!");
+//                 display.sendBuffer();
+//                 messageStartTime = currentTime;
+//                 setLongPressExecuted = true;
+//                 showingWelcome = true;
+//                 displayActive = true;
+//             }
+//         } else if (setState && setPressStartTime) {
+//             setPressStartTime = 0;
+//             setLongPressExecuted = false;
+//             lastDebounceTime = currentTime;
+//         }
+//         return;
+//     }
+
+//     // Obsługa przycisków gdy wyświetlacz jest aktywny
+//     if (!showingWelcome) {
+//         // Obsługa przycisku UP (zmiana asysty)
+//         if (!upState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+//             if (!upPressStartTime) {
+//                 upPressStartTime = currentTime;
+//             } else if (!upLongPressExecuted && (currentTime - upPressStartTime) > LONG_PRESS_TIME) {
+//                 lightMode = (lightMode + 1) % 3;
+//                 setLights();
+//                 upLongPressExecuted = true;
+//             }
+//         } else if (upState && upPressStartTime) {
+//             if (!upLongPressExecuted && (currentTime - upPressStartTime) < LONG_PRESS_TIME) {
+//                 if (assistLevel < 5) assistLevel++;
+//             }
+//             upPressStartTime = 0;
+//             upLongPressExecuted = false;
+//             lastDebounceTime = currentTime;
+//         }
+
+//         // Obsługa przycisku DOWN (zmiana asysty)
+//         if (!downState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+//             if (!downPressStartTime) {
+//                 downPressStartTime = currentTime;
+//             } else if (!downLongPressExecuted && (currentTime - downPressStartTime) > LONG_PRESS_TIME) {
+//                 assistLevelAsText = !assistLevelAsText;
+//                 downLongPressExecuted = true;
+//             }
+//         } else if (downState && downPressStartTime) {
+//             if (!downLongPressExecuted && (currentTime - downPressStartTime) < LONG_PRESS_TIME) {
+//                 if (assistLevel > 0) assistLevel--;
+//             }
+//             downPressStartTime = 0;
+//             downLongPressExecuted = false;
+//             lastDebounceTime = currentTime;
+//         }
+
+//         // Obsługa przycisku SET
+//         static unsigned long lastSetRelease = 0;
+//         static bool waitingForSecondClick = false;
+
+//         if (!setState) { // Przycisk wciśnięty
+//             if (!setPressStartTime) {
+//                 setPressStartTime = currentTime;
+//             } else if (!setLongPressExecuted && (currentTime - setPressStartTime) > SET_LONG_PRESS) {
+//                 // Długie przytrzymanie (>3s) - wyłączenie
+//                 display.clearBuffer();
+//                 display.setFont(u8g2_font_pxplusibmvga9_mf);
+//                 display.drawStr(20, 32, "Do widzenia :)");
+//                 display.sendBuffer();
+//                 messageStartTime = currentTime;
+//                 setLongPressExecuted = true;
+//             }
+//         } else if (setPressStartTime) { // Przycisk puszczony
+//             if (!setLongPressExecuted) {
+//                 unsigned long releaseTime = currentTime;
+                
+//                 if (waitingForSecondClick && (releaseTime - lastSetRelease) < DOUBLE_CLICK_TIME) {
+//                     // Podwójne kliknięcie
+//                     if (inSubScreen) {
+//                         inSubScreen = false; // Wyjście z pod-ekranów
+//                     } else if (hasSubScreens(currentMainScreen)) {
+//                         inSubScreen = true;  // Wejście do pod-ekranów
+//                         currentSubScreen = 0;
+//                     }
+//                     waitingForSecondClick = false;
+//                 } else {
+//                     // Pojedyncze kliknięcie
+//                     if (!waitingForSecondClick) {
+//                         waitingForSecondClick = true;
+//                         lastSetRelease = releaseTime;
+//                     } else if ((releaseTime - lastSetRelease) >= DOUBLE_CLICK_TIME) {
+//                         // Przełączanie ekranów/pod-ekranów
+//                         if (inSubScreen) {
+//                             currentSubScreen = (currentSubScreen + 1) % getSubScreenCount(currentMainScreen);
+//                         } else {
+//                             currentMainScreen = (MainScreen)((currentMainScreen + 1) % MAIN_SCREEN_COUNT);
+//                         }
+//                         waitingForSecondClick = false;
+//                     }
+//                 }
+//             }
+//             setPressStartTime = 0;
+//             setLongPressExecuted = false;
+//             lastDebounceTime = currentTime;
+//         }
+
+//         // Reset flagi oczekiwania na drugie kliknięcie po upływie czasu
+//         if (waitingForSecondClick && (currentTime - lastSetRelease) >= DOUBLE_CLICK_TIME) {
+//             // Wykonaj akcję pojedynczego kliknięcia
+//             if (inSubScreen) {
+//                 currentSubScreen = (currentSubScreen + 1) % getSubScreenCount(currentMainScreen);
+//             } else {
+//                 currentMainScreen = (MainScreen)((currentMainScreen + 1) % MAIN_SCREEN_COUNT);
+//             }
+//             waitingForSecondClick = false;
+//         }
+//     }
+
+//     // Obsługa komunikatów powitalnych/pożegnalnych
+//     if (messageStartTime > 0 && (currentTime - messageStartTime) >= GOODBYE_DELAY) {
+//         if (!showingWelcome) {
+//             displayActive = false;
+//             goToSleep();
+//         }
+//         messageStartTime = 0;
+//         showingWelcome = false;
+//     }
+// }
+
 void handleButtons() {
     unsigned long currentTime = millis();
     bool setState = digitalRead(BTN_SET);
@@ -738,7 +899,11 @@ void handleButtons() {
                 
                 if (waitingForSecondClick && (releaseTime - lastSetRelease) < DOUBLE_CLICK_TIME) {
                     // Podwójne kliknięcie
-                    if (inSubScreen) {
+                    if (currentMainScreen == USB_SCREEN) {
+                        // Przełącz stan USB
+                        usbEnabled = !usbEnabled;
+                        digitalWrite(UsbPin, usbEnabled ? HIGH : LOW);
+                    } else if (inSubScreen) {
                         inSubScreen = false; // Wyjście z pod-ekranów
                     } else if (hasSubScreens(currentMainScreen)) {
                         inSubScreen = true;  // Wejście do pod-ekranów
@@ -798,6 +963,7 @@ bool hasSubScreens(MainScreen screen) {
         case BATTERY_SCREEN: return BATTERY_SUB_COUNT > 1;
         case POWER_SCREEN: return POWER_SUB_COUNT > 1;
         case PRESSURE_SCREEN: return PRESSURE_SUB_COUNT > 1;
+        case USB_SCREEN: return false;
         default: return false;
     }
 }
