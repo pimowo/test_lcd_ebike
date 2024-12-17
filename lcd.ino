@@ -443,15 +443,6 @@ void drawAssistLevel() {
   display.drawStr(10, 54, modeText);
 }
 
-// void drawValueAndUnit(const char* valueStr, const char* unitStr) {
-//     int valueWidth = display.getStrWidth(valueStr);
-//     display.drawStr(128 - valueWidth, 43, valueStr); // Bez dodatkowego marginesu
-
-//     display.setFont(u8g2_font_profont11_tr);
-//     int unitWidth = display.getStrWidth(unitStr);
-//     display.drawStr(128 - unitWidth, 53, unitStr);
-// }
-
 void drawValueAndUnit(const char* valueStr, const char* unitStr) {
     // Dla PRESSURE_SCREEN wyświetlamy tylko jednostkę i opis, pomijamy wartość
     if (currentMainScreen != PRESSURE_SCREEN) {
