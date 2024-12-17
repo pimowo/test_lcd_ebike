@@ -9,6 +9,57 @@
 #include <BLEClient.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <LittleFS.h>
+#include <ArduinoJson.h>
+#include <TimeLib.h>
+
+// Utworzenie serwera na porcie 80
+AsyncWebServer server(80);
+
+// Struktury dla ustawień
+struct TimeSettings {
+    bool ntpEnabled;
+    int8_t hours;
+    int8_t minutes;
+    int8_t seconds;
+    int8_t day;
+    int8_t month;
+    int16_t year;
+};
+
+struct LightSettings {
+    enum LightMode {
+        FRONT,
+        REAR,
+        BOTH
+    };
+    LightMode dayLights;
+    bool dayBlink;
+    LightMode nightLights;
+    bool nightBlink;
+    bool blinkEnabled;
+    int blinkFrequency; // ms
+};
+
+struct BacklightSettings {
+    int dayBrightness;   // %
+    int nightBrightness; // %
+    bool autoMode;
+};
+
+struct WiFiSettings {
+    char ssid[32];
+    char password[64];
+};
+
+// Globalne instancje ustawień
+TimeSettings timeSettings;
+LightSettings lightSettings;
+BacklightSettings backlightSettings;
+WiFiSettings wifiSettings;
 
 // --- Definicje pinów ---
 // Przyciski
@@ -442,6 +493,15 @@ void drawAssistLevel() {
   }
   display.drawStr(10, 54, modeText);
 }
+
+// void drawValueAndUnit(const char* valueStr, const char* unitStr) {
+//     int valueWidth = display.getStrWidth(valueStr);
+//     display.drawStr(128 - valueWidth, 43, valueStr); // Bez dodatkowego marginesu
+
+//     display.setFont(u8g2_font_profont11_tr);
+//     int unitWidth = display.getStrWidth(unitStr);
+//     display.drawStr(128 - unitWidth, 53, unitStr);
+// }
 
 void drawValueAndUnit(const char* valueStr, const char* unitStr) {
     // Dla PRESSURE_SCREEN wyświetlamy tylko jednostkę i opis, pomijamy wartość
@@ -944,19 +1004,166 @@ void handleTemperature() {
     }
 }
 
-// Główne funkcje programu
+// // Główne funkcje programu
+// void setup() {
+//     // Sprawdź przyczynę wybudzenia
+//     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    
+//     Serial.begin(115200);
+
+//     Wire.begin();
+
+//     // Inicjalizacja DS18B20
+//     initializeDS18B20();
+//     sensors.setWaitForConversion(false);  // Ważne - tryb nieblokujący
+    
+//     sensors.setResolution(12);  // Ustaw najwyższą rozdzielczość
+//     tempSensor.requestTemperature();  // Pierwsze żądanie pomiaru
+    
+//     // Inicjalizacja RTC
+//     if (!rtc.begin()) {
+//         Serial.println("Couldn't find RTC");
+//         while (1);
+//     }
+
+//     // Jeśli chcesz ustawić czas, odkomentuj poniższą linię
+//     //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+
+//     // Ustaw aktualny czas (rok, miesiąc, dzień, godzina, minuta, sekunda)
+//     //rtc.adjust(DateTime(2024, 12, 14, 13, 31, 0)); // Pamiętaj o strefie czasowej (UTC+1)
+
+    
+//     // Jeśli RTC stracił zasilanie, ustaw go
+//     if (rtc.lostPower()) {
+//         Serial.println("RTC lost power, lets set the time!");
+//         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+//     }
+
+//     // Konfiguracja pinów
+//     pinMode(BTN_UP, INPUT_PULLUP);
+//     pinMode(BTN_DOWN, INPUT_PULLUP);
+//     pinMode(BTN_SET, INPUT_PULLUP);
+
+//     // Konfiguracja pinów LED
+//     pinMode(FrontDayPin, OUTPUT);
+//     pinMode(FrontPin, OUTPUT);
+//     pinMode(RealPin, OUTPUT);
+//     digitalWrite(FrontDayPin, LOW);
+//     digitalWrite(FrontPin, LOW);
+//     digitalWrite(RealPin, LOW);
+//     setLights();
+
+//     // Ładowarka USB
+//     pinMode(UsbPin, OUTPUT);
+//     digitalWrite(UsbPin, LOW);
+    
+//     // Inicjalizacja I2C i wyświetlacza
+//     display.begin();
+//     display.enableUTF8Print();
+//     display.setFontDirection(0);
+
+//     // Wyczyść wyświetlacz na starcie
+//     display.clearBuffer();
+//     display.sendBuffer();
+
+//     // Jeśli wybudzenie przez przycisk SET, poczekaj na długie naciśnięcie
+//     if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+//         unsigned long startTime = millis();
+//         while(!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
+//             if((millis() - startTime) > SET_LONG_PRESS) {
+//                 displayActive = true;
+//                 showingWelcome = true;
+//                 messageStartTime = millis();
+                
+//                 display.clearBuffer();
+//                 display.setFont(u8g2_font_pxplusibmvga9_mf);
+//                 display.drawStr(40, 32, "Witaj!");
+//                 display.sendBuffer();
+                
+//                 while(!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
+//                     delay(10);
+//                 }
+//                 break;
+//             }
+//             delay(10);
+//         }
+//     }
+// }
+
+// Inicjalizacja domyślnych wartości
+void initializeDefaultSettings() {
+    // Czas
+    timeSettings.ntpEnabled = false;
+    timeSettings.hours = 0;
+    timeSettings.minutes = 0;
+    timeSettings.seconds = 0;
+    timeSettings.day = 1;
+    timeSettings.month = 1;
+    timeSettings.year = 2024;
+
+    // Światła
+    lightSettings.dayLights = LightSettings::FRONT;
+    lightSettings.dayBlink = false;
+    lightSettings.nightLights = LightSettings::BOTH;
+    lightSettings.nightBlink = false;
+    lightSettings.blinkEnabled = false;
+    lightSettings.blinkFrequency = 500;
+
+    // Podświetlenie
+    backlightSettings.dayBrightness = 100;
+    backlightSettings.nightBrightness = 50;
+    backlightSettings.autoMode = false;
+
+    // WiFi - początkowo puste
+    memset(wifiSettings.ssid, 0, sizeof(wifiSettings.ssid));
+    memset(wifiSettings.password, 0, sizeof(wifiSettings.password));
+}
+
+// Funkcja synchronizacji czasu przez NTP
+void synchronizeTime() {
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    Serial.println("Waiting for NTP time sync...");
+    time_t now = time(nullptr);
+    while (now < 8 * 3600 * 2) {
+        delay(500);
+        Serial.print(".");
+        now = time(nullptr);
+    }
+    Serial.println();
+    
+    struct tm timeinfo;
+    gmtime_r(&now, &timeinfo);
+    rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, 
+                       timeinfo.tm_mday, timeinfo.tm_hour, 
+                       timeinfo.tm_min, timeinfo.tm_sec));
+}
+
+// Funkcja aktualizacji podświetlenia
+void updateBacklight() {
+    if (backlightSettings.autoMode) {
+        // Auto mode - ustaw jasność na podstawie trybu dzień/noc
+        // Zakładam, że masz zmienną określającą tryb dzienny/nocny
+        bool isDayMode = true; // Tu trzeba dodać właściwą logikę
+        int brightness = isDayMode ? backlightSettings.dayBrightness : backlightSettings.nightBrightness;
+        // Tu dodaj kod ustawiający jasność wyświetlacza
+    } else {
+        // Manual mode - ustaw stałą jasność
+        // Tu dodaj kod ustawiający jasność wyświetlacza
+    }
+}
+
 void setup() {
     // Sprawdź przyczynę wybudzenia
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
     
     Serial.begin(115200);
 
+    // Inicjalizacja I2C
     Wire.begin();
 
     // Inicjalizacja DS18B20
     initializeDS18B20();
     sensors.setWaitForConversion(false);  // Ważne - tryb nieblokujący
-    
     sensors.setResolution(12);  // Ustaw najwyższą rozdzielczość
     tempSensor.requestTemperature();  // Pierwsze żądanie pomiaru
     
@@ -966,19 +1173,47 @@ void setup() {
         while (1);
     }
 
-    // Jeśli chcesz ustawić czas, odkomentuj poniższą linię
-    //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-
-    // Ustaw aktualny czas (rok, miesiąc, dzień, godzina, minuta, sekunda)
-    //rtc.adjust(DateTime(2024, 12, 14, 13, 31, 0)); // Pamiętaj o strefie czasowej (UTC+1)
-
-    
-    // Jeśli RTC stracił zasilanie, ustaw go
+    // Sprawdzenie RTC
     if (rtc.lostPower()) {
         Serial.println("RTC lost power, lets set the time!");
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 
+    // Inicjalizacja LittleFS
+    if(!LittleFS.begin(true)) {
+        Serial.println("Error mounting LittleFS");
+        return;
+    }
+
+    // Inicjalizacja domyślnych ustawień
+    initializeDefaultSettings();
+    
+    // Wczytanie zapisanych ustawień
+    loadSettings();
+
+    // Konfiguracja WiFi
+    WiFi.mode(WIFI_STA);
+    if (strlen(wifiSettings.ssid) > 0) {
+        WiFi.begin(wifiSettings.ssid, wifiSettings.password);
+        // Czekaj maksymalnie 10 sekund na połączenie
+        int attempts = 0;
+        while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+            delay(500);
+            Serial.print(".");
+            attempts++;
+        }
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.println("\nConnected to WiFi");
+            // Jeśli NTP włączone, synchronizuj czas
+            if (timeSettings.ntpEnabled) {
+                synchronizeTime();
+            }
+        }
+    }
+
+    // Konfiguracja serwera WWW
+    setupWebServer();
+    
     // Konfiguracja pinów
     pinMode(BTN_UP, INPUT_PULLUP);
     pinMode(BTN_DOWN, INPUT_PULLUP);
@@ -997,7 +1232,7 @@ void setup() {
     pinMode(UsbPin, OUTPUT);
     digitalWrite(UsbPin, LOW);
     
-    // Inicjalizacja I2C i wyświetlacza
+    // Inicjalizacja wyświetlacza
     display.begin();
     display.enableUTF8Print();
     display.setFontDirection(0);
@@ -1028,6 +1263,9 @@ void setup() {
             delay(10);
         }
     }
+
+    // Ustaw aktualną jasność podświetlenia
+    updateBacklight();
 }
 
 void loop() {
