@@ -1342,6 +1342,51 @@ void updateBacklight() {
 //   u8g2.setContrast(kontrast);
 // }
 
+#include <esp_partition.h>
+
+// Sprawdzenie i formatowanie systemu plików przy starcie
+void initLittleFS() {
+    if(!LittleFS.begin(true)) {
+        Serial.println("LittleFS Mount Failed");
+        if(!LittleFS.format()) {
+            Serial.println("LittleFS Format Failed");
+            return;
+        }
+        if(!LittleFS.begin()) {
+            Serial.println("LittleFS Mount Failed After Format");
+            return;
+        }
+    }
+    Serial.println("LittleFS Mounted Successfully");
+}
+
+void listFiles() {
+    Serial.println("Files in LittleFS:");
+    File root = LittleFS.open("/");
+    if(!root){
+        Serial.println("- Failed to open directory");
+        return;
+    }
+    if(!root.isDirectory()){
+        Serial.println(" - Not a directory");
+        return;
+    }
+
+    File file = root.openNextFile();
+    while(file){
+        if(file.isDirectory()){
+            Serial.print("  DIR : ");
+            Serial.println(file.name());
+        } else {
+            Serial.print("  FILE: ");
+            Serial.print(file.name());
+            Serial.print("\tSIZE: ");
+            Serial.println(file.size());
+        }
+        file = root.openNextFile();
+    }
+}
+
 void setup() {
     // Sprawdź przyczynę wybudzenia
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -1374,6 +1419,7 @@ void setup() {
         Serial.println("Error mounting LittleFS");
         return;
     }
+    Serial.println("LittleFS mounted successfully");
 
     // Inicjalizacja domyślnych ustawień
     initializeDefaultSettings();
