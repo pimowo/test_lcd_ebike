@@ -1090,6 +1090,149 @@ void handleTemperature() {
 //     }
 // }
 
+// Funkcja ładowania ustawień z LittleFS
+void loadSettings() {
+    File configFile = LittleFS.open("/config.json", "r");
+    if (!configFile) {
+        Serial.println("Failed to open config file");
+        return;
+    }
+
+    StaticJsonDocument<1024> doc;
+    DeserializationError error = deserializeJson(doc, configFile);
+    
+    if (error) {
+        Serial.println("Failed to parse config file");
+        return;
+    }
+
+    // Wczytywanie ustawień czasu
+    if (doc.containsKey("time")) {
+        timeSettings.ntpEnabled = doc["time"]["ntpEnabled"] | false;
+        timeSettings.hours = doc["time"]["hours"] | 0;
+        timeSettings.minutes = doc["time"]["minutes"] | 0;
+        timeSettings.seconds = doc["time"]["seconds"] | 0;
+        timeSettings.day = doc["time"]["day"] | 1;
+        timeSettings.month = doc["time"]["month"] | 1;
+        timeSettings.year = doc["time"]["year"] | 2024;
+    }
+
+    // Wczytywanie ustawień świateł
+    if (doc.containsKey("light")) {
+        lightSettings.dayLights = static_cast<LightSettings::LightMode>(doc["light"]["dayLights"] | 0);
+        lightSettings.dayBlink = doc["light"]["dayBlink"] | false;
+        lightSettings.nightLights = static_cast<LightSettings::LightMode>(doc["light"]["nightLights"] | 0);
+        lightSettings.nightBlink = doc["light"]["nightBlink"] | false;
+        lightSettings.blinkEnabled = doc["light"]["blinkEnabled"] | false;
+        lightSettings.blinkFrequency = doc["light"]["blinkFrequency"] | 500;
+    }
+
+    // Wczytywanie ustawień podświetlenia
+    if (doc.containsKey("backlight")) {
+        backlightSettings.dayBrightness = doc["backlight"]["dayBrightness"] | 100;
+        backlightSettings.nightBrightness = doc["backlight"]["nightBrightness"] | 50;
+        backlightSettings.autoMode = doc["backlight"]["autoMode"] | false;
+    }
+
+    // Wczytywanie ustawień WiFi
+    if (doc.containsKey("wifi")) {
+        strlcpy(wifiSettings.ssid, doc["wifi"]["ssid"] | "", sizeof(wifiSettings.ssid));
+        strlcpy(wifiSettings.password, doc["wifi"]["password"] | "", sizeof(wifiSettings.password));
+    }
+
+    configFile.close();
+}
+
+// Funkcja zapisu ustawień do LittleFS
+void saveSettings() {
+    StaticJsonDocument<1024> doc;
+
+    // Zapisywanie ustawień czasu
+    JsonObject timeObj = doc.createNestedObject("time");
+    timeObj["ntpEnabled"] = timeSettings.ntpEnabled;
+    timeObj["hours"] = timeSettings.hours;
+    timeObj["minutes"] = timeSettings.minutes;
+    timeObj["seconds"] = timeSettings.seconds;
+    timeObj["day"] = timeSettings.day;
+    timeObj["month"] = timeSettings.month;
+    timeObj["year"] = timeSettings.year;
+
+    // Zapisywanie ustawień świateł
+    JsonObject lightObj = doc.createNestedObject("light");
+    lightObj["dayLights"] = static_cast<int>(lightSettings.dayLights);
+    lightObj["dayBlink"] = lightSettings.dayBlink;
+    lightObj["nightLights"] = static_cast<int>(lightSettings.nightLights);
+    lightObj["nightBlink"] = lightSettings.nightBlink;
+    lightObj["blinkEnabled"] = lightSettings.blinkEnabled;
+    lightObj["blinkFrequency"] = lightSettings.blinkFrequency;
+
+    // Zapisywanie ustawień podświetlenia
+    JsonObject backlightObj = doc.createNestedObject("backlight");
+    backlightObj["dayBrightness"] = backlightSettings.dayBrightness;
+    backlightObj["nightBrightness"] = backlightSettings.nightBrightness;
+    backlightObj["autoMode"] = backlightSettings.autoMode;
+
+    // Zapisywanie ustawień WiFi
+    JsonObject wifiObj = doc.createNestedObject("wifi");
+    wifiObj["ssid"] = wifiSettings.ssid;
+    wifiObj["password"] = wifiSettings.password;
+
+    File configFile = LittleFS.open("/config.json", "w");
+    if (!configFile) {
+        Serial.println("Failed to open config file for writing");
+        return;
+    }
+
+    if (serializeJson(doc, configFile) == 0) {
+        Serial.println("Failed to write config file");
+    }
+
+    configFile.close();
+}
+
+// Konfiguracja serwera WWW
+void setupWebServer() {
+    // Serwowanie plików statycznych
+    server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+
+    // API endpoints
+    server.on("/api/time", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (request->hasParam("data", true)) {
+            StaticJsonDocument<200> doc;
+            DeserializationError error = deserializeJson(doc, request->getParam("data", true)->value());
+            
+            if (!error) {
+                timeSettings.ntpEnabled = doc["ntpEnabled"] | false;
+                if (timeSettings.ntpEnabled) {
+                    synchronizeTime();
+                } else {
+                    // Ręczne ustawienie czasu
+                    DateTime now(
+                        doc["year"] | 2024,
+                        doc["month"] | 1,
+                        doc["day"] | 1,
+                        doc["hours"] | 0,
+                        doc["minutes"] | 0,
+                        doc["seconds"] | 0
+                    );
+                    rtc.adjust(now);
+                }
+                saveSettings();
+                request->send(200, "application/json", "{\"status\":\"ok\"}");
+            } else {
+                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+            }
+        } else {
+            request->send(400, "application/json", "{\"error\":\"Missing data\"}");
+        }
+    });
+
+    // Podobne endpointy dla innych ustawień...
+    // Tu dodaj pozostałe endpointy API
+
+    server.begin();
+}
+
 // Inicjalizacja domyślnych wartości
 void initializeDefaultSettings() {
     // Czas
