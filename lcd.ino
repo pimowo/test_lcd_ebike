@@ -1190,46 +1190,84 @@ void saveSettings() {
     configFile.close();
 }
 
-// Konfiguracja serwera WWW
+// W funkcji setup(), po inicjalizacji wyświetlacza, dodaj:
 void setupWebServer() {
     // Serwowanie plików statycznych
-    server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+    server.serveStatic("/", LittleFS, "/");
 
-    // API endpoints
+    // Endpoint dla aktualnego stanu
+    server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+        StaticJsonDocument<512> doc;
+        
+        // Dodaj aktualny czas
+        DateTime now = rtc.now();
+        doc["time"]["hours"] = now.hour();
+        doc["time"]["minutes"] = now.minute();
+        doc["time"]["seconds"] = now.second();
+        doc["time"]["day"] = now.day();
+        doc["time"]["month"] = now.month();
+        doc["time"]["year"] = now.year();
+        
+        // Dodaj stan świateł
+        doc["lights"]["frontDay"] = digitalRead(FrontDayPin);
+        doc["lights"]["front"] = digitalRead(FrontPin);
+        doc["lights"]["rear"] = digitalRead(RealPin);
+        
+        // Dodaj temperaturę
+        doc["temperature"] = temperature;
+        
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+
+    // Endpoint dla ustawień świateł
+    server.on("/api/lights", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (request->hasParam("data", true)) {
+            StaticJsonDocument<200> doc;
+            DeserializationError error = deserializeJson(doc, request->getParam("data", true)->value());
+            
+            if (!error) {
+                // Aktualizuj ustawienia świateł
+                if (doc.containsKey("frontDay")) {
+                    digitalWrite(FrontDayPin, doc["frontDay"].as<bool>());
+                }
+                if (doc.containsKey("front")) {
+                    digitalWrite(FrontPin, doc["front"].as<bool>());
+                }
+                if (doc.containsKey("rear")) {
+                    digitalWrite(RealPin, doc["rear"].as<bool>());
+                }
+                
+                request->send(200, "application/json", "{\"status\":\"ok\"}");
+            } else {
+                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+            }
+        }
+    });
+
     server.on("/api/time", HTTP_POST, [](AsyncWebServerRequest *request) {
         if (request->hasParam("data", true)) {
             StaticJsonDocument<200> doc;
             DeserializationError error = deserializeJson(doc, request->getParam("data", true)->value());
             
             if (!error) {
-                timeSettings.ntpEnabled = doc["ntpEnabled"] | false;
-                if (timeSettings.ntpEnabled) {
-                    synchronizeTime();
-                } else {
-                    // Ręczne ustawienie czasu
-                    DateTime now(
-                        doc["year"] | 2024,
-                        doc["month"] | 1,
-                        doc["day"] | 1,
-                        doc["hours"] | 0,
-                        doc["minutes"] | 0,
-                        doc["seconds"] | 0
-                    );
-                    rtc.adjust(now);
-                }
-                saveSettings();
+                int year = doc["year"] | 2024;
+                int month = doc["month"] | 1;
+                int day = doc["day"] | 1;
+                int hour = doc["hour"] | 0;
+                int minute = doc["minute"] | 0;
+                int second = doc["second"] | 0;
+                
+                rtc.adjust(DateTime(year, month, day, hour, minute, second));
                 request->send(200, "application/json", "{\"status\":\"ok\"}");
             } else {
                 request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
             }
-        } else {
-            request->send(400, "application/json", "{\"error\":\"Missing data\"}");
         }
     });
 
-    // Podobne endpointy dla innych ustawień...
-    // Tu dodaj pozostałe endpointy API
-
+    // Start serwera
     server.begin();
 }
 
@@ -1295,6 +1333,15 @@ void updateBacklight() {
     }
 }
 
+// Funkcja do ustawienia jasności w %
+// void ustawJasnosc(int jasnosc_procent) {
+//   // Przekształcenie procentów na zakres 0-255
+//   int kontrast = map(jasnosc_procent, 0, 100, 0, 255);
+  
+//   // Ustawienie kontrastu
+//   u8g2.setContrast(kontrast);
+// }
+
 void setup() {
     // Sprawdź przyczynę wybudzenia
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -1353,9 +1400,6 @@ void setup() {
             }
         }
     }
-
-    // Konfiguracja serwera WWW
-    setupWebServer();
     
     // Konfiguracja pinów
     pinMode(BTN_UP, INPUT_PULLUP);
@@ -1380,9 +1424,25 @@ void setup() {
     display.enableUTF8Print();
     display.setFontDirection(0);
 
+    // Ustawienie jasności na 50%
+    //ustawJasnosc(50);
+
     // Wyczyść wyświetlacz na starcie
     display.clearBuffer();
     display.sendBuffer();
+
+        // Konfiguracja WiFi - dodaj po inicjalizacji wyświetlacza
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP("e-Bike-System", "password123"); // Zmień nazwę i hasło według potrzeb
+
+    // Inicjalizacja LittleFS
+    if(!LittleFS.begin()) {
+        Serial.println("An Error has occurred while mounting LittleFS");
+        return;
+    }
+
+    // Konfiguracja serwera WWW
+    setupWebServer();
 
     // Jeśli wybudzenie przez przycisk SET, poczekaj na długie naciśnięcie
     if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
