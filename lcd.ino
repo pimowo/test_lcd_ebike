@@ -1213,7 +1213,7 @@ void setupWebServer() {
         doc["lights"]["front"] = digitalRead(FrontPin);
         doc["lights"]["rear"] = digitalRead(RealPin);
         
-        // Dodaj temperaturę - używamy Twojej funkcji temperatureRead()
+        // Dodaj temperaturę
         doc["temperature"] = temperatureRead();
         
         String response;
@@ -1245,31 +1245,6 @@ void setupWebServer() {
             }
         }
     });
-
-    server.on("/api/time", HTTP_POST, [](AsyncWebServerRequest *request) {
-        if (request->hasParam("data", true)) {
-            StaticJsonDocument<200> doc;
-            DeserializationError error = deserializeJson(doc, request->getParam("data", true)->value());
-            
-            if (!error) {
-                int year = doc["year"] | 2024;
-                int month = doc["month"] | 1;
-                int day = doc["day"] | 1;
-                int hour = doc["hour"] | 0;
-                int minute = doc["minute"] | 0;
-                int second = doc["second"] | 0;
-                
-                rtc.adjust(DateTime(year, month, day, hour, minute, second));
-                request->send(200, "application/json", "{\"status\":\"ok\"}");
-            } else {
-                request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-            }
-        }
-    });
-
-    // Start serwera
-    server.begin();
-}
 
     server.on("/api/time", HTTP_POST, [](AsyncWebServerRequest *request) {
         if (request->hasParam("data", true)) {
@@ -1458,7 +1433,7 @@ void setup() {
 
         // Konfiguracja WiFi - dodaj po inicjalizacji wyświetlacza
     WiFi.mode(WIFI_AP);
-    WiFi.softAP("e-Bike-System", "password123"); // Zmień nazwę i hasło według potrzeb
+    WiFi.softAP("e-Bike System", "#mamrower"); // Zmień nazwę i hasło według potrzeb
 
     // Inicjalizacja LittleFS
     if(!LittleFS.begin()) {
