@@ -1482,10 +1482,10 @@ void setup() {
     WiFi.softAP("e-Bike System", "#mamrower"); // Zmień nazwę i hasło według potrzeb
 
     // Inicjalizacja LittleFS
-    if(!LittleFS.begin()) {
-        Serial.println("An Error has occurred while mounting LittleFS");
-        return;
-    }
+    // if(!LittleFS.begin()) {
+    //     Serial.println("An Error has occurred while mounting LittleFS");
+    //     return;
+    // }
 
     // Konfiguracja serwera WWW
     setupWebServer();
