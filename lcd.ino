@@ -1197,40 +1197,44 @@ void setupWebServer() {
 
   // Endpoint dla aktualnego stanu
   server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* request) {
-    StaticJsonDocument<512> doc;
+      StaticJsonDocument<512> doc;
+      
+      // Pobierz czas z RTC
+      DateTime now = rtc.now();
+      
+      // Utwórz obiekt czasu
+      JsonObject timeObj = doc.createNestedObject("time");
+      
+      // Format czasu dla wyświetlania
+      char timeStr[64];
+      snprintf(timeStr, sizeof(timeStr), "%04d-%02d-%02d %02d:%02d:%02d",
+          now.year(), now.month(), now.day(),
+          now.hour(), now.minute(), now.second());
+      
+      // Dodaj czas w dwóch formatach
+      timeObj["formatted"] = timeStr;  // Format czytelny
+      timeObj["timezone"] = "Europe/Warsaw";
+      
+      // Dodaj poszczególne komponenty czasu
+      timeObj["hours"] = now.hour();
+      timeObj["minutes"] = now.minute();
+      timeObj["seconds"] = now.second();
+      timeObj["day"] = now.day();
+      timeObj["month"] = now.month();
+      timeObj["year"] = now.year();
 
-    StaticJsonDocument<512> doc;
-    time_t now;
-    time(&now);
-    struct tm timeinfo;
-    localtime_r(&now, &timeinfo);
-    
-    char timeStr[64];
-    strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
-    
-    doc["time"] = timeStr;
-    doc["timezone"] = "Europe/Warsaw";
-    
-    // Dodaj aktualny czas
-    DateTime now = rtc.now();
-    doc["time"]["hours"] = now.hour();
-    doc["time"]["minutes"] = now.minute();
-    doc["time"]["seconds"] = now.second();
-    doc["time"]["day"] = now.day();
-    doc["time"]["month"] = now.month();
-    doc["time"]["year"] = now.year();
+      // Dodaj stan świateł jako osobny obiekt
+      JsonObject lightsObj = doc.createNestedObject("lights");
+      lightsObj["frontDay"] = digitalRead(FrontDayPin);
+      lightsObj["front"] = digitalRead(FrontPin);
+      lightsObj["rear"] = digitalRead(RealPin);
 
-    // Dodaj stan świateł
-    doc["lights"]["frontDay"] = digitalRead(FrontDayPin);
-    doc["lights"]["front"] = digitalRead(FrontPin);
-    doc["lights"]["rear"] = digitalRead(RealPin);
+      // Dodaj temperaturę
+      doc["temperature"] = temperatureRead();
 
-    // Dodaj temperaturę
-    doc["temperature"] = temperatureRead();
-
-    String response;
-    serializeJson(doc, response);
-    request->send(200, "application/json", response);
+      String response;
+      serializeJson(doc, response);
+      request->send(200, "application/json", response);
   });
 
   // Endpoint dla ustawień świateł
