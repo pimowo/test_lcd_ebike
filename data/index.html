@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Bike System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>E-Bike System</h1>
+            <div class="status-bar">
+                <div class="time"></div>
+                <div class="battery"></div>
+            </div>
+        </header>
+
+        <main>
+            <section class="dashboard">
+                <div class="card speed">
+                    <h2>Prędkość</h2>
+                    <div class="value">0.0</div>
+                    <div class="unit">km/h</div>
+                </div>
+
+                <div class="card temperature">
+                    <h2>Temperatura</h2>
+                    <div class="value">25.0</div>
+                    <div class="unit">°C</div>
+                </div>
+
+                <div class="card battery-status">
+                    <h2>Bateria</h2>
+                    <div class="value">100</div>
+                    <div class="unit">%</div>
+                </div>
+
+                <div class="card power">
+                    <h2>Moc</h2>
+                    <div class="value">0</div>
+                    <div class="unit">W</div>
+                </div>
+            </section>
+
+            <section class="controls">
+                <div class="lights">
+                    <h2>Światła</h2>
+                    <button class="btn-light" data-light="front">Przód</button>
+                    <button class="btn-light" data-light="rear">Tył</button>
+                    <button class="btn-light" data-light="day">Dzienne</button>
+                </div>
+
+                <div class="assist">
+                    <h2>Wspomaganie</h2>
+                    <button class="btn-assist" data-level="down">-</button>
+                    <span class="assist-level">3</span>
+                    <button class="btn-assist" data-level="up">+</button>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
