@@ -1,3 +1,37 @@
+/*
+// BEZPIECZNE PINY DO UŻYCIA (bez jakichkolwiek ograniczeń):
+// GPIO13, GPIO14, GPIO16, GPIO17, GPIO18, GPIO19, GPIO21, GPIO22, GPIO23, GPIO25, GPIO26, GPIO27, GPIO32, GPIO33
+
+// ===== CZUJNIKI E-BIKE =====
+#define PIN_BRAKE      33    // Hamulec
+#define PIN_PAS        25    // PAS (czujnik pedałowania)
+#define PIN_SPEED      26    // Pomiar prędkości
+#define PIN_CADENCE    27    // Pomiar kadencji
+#define PIN_THROTTLE   23    // Manetka wyjście
+#define PIN_USB_CHARGER 32   // Ładowarka USB
+
+// ===== PRZYCISKI =====
+#define PIN_BTN_UP     13    // Przycisk UP
+#define PIN_BTN_DOWN   14    // Przycisk DOWN
+#define PIN_BTN_SET    19    // Przycisk SET (przeniesiony z GPIO12)
+
+// ===== ŚWIATŁA =====
+#define PIN_FRONT      18    // Światło przód
+#define PIN_REAR       21    // Światło tył
+#define PIN_FRONT_DAY  22    // Światła dzienne (przeniesione z GPIO5)
+
+// ===== KOMUNIKACJA =====
+#define PIN_RX2        16    // RX sterownik
+#define PIN_TX2        17    // TX sterownik
+
+// ===== TEMPERATURA =====
+// Te piny wymagają zmiany z oryginalnych GPIO2, GPIO4 i GPIO15
+#define PIN_TEMP_AMB   26    // DS18B20 temp. otoczenia
+#define PIN_TEMP_MOT   25    // NTC 10k temp. silnika
+#define PIN_TEMP_CTRL  23    // DS18B20 temp. sterownika
+*/
+
+
 // --- Biblioteki ---
 #include <Wire.h>
 #include <U8g2lib.h>
@@ -1432,6 +1466,34 @@ bool loadConfig() {
     return true;
 }
 
+// Synchronizacja RTC z NTP
+void syncRTCWithNTP() {
+    configTime(0, 0, "pool.ntp.org");
+    delay(1000);
+    time_t now;
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+        rtc.adjust(DateTime(
+            timeinfo.tm_year + 1900,
+            timeinfo.tm_mon + 1,
+            timeinfo.tm_mday,
+            timeinfo.tm_hour,
+            timeinfo.tm_min,
+            timeinfo.tm_sec
+        ));
+    }
+}
+
+void listFiles() {
+    File root = LittleFS.open("/");
+    File file = root.openNextFile();
+    while(file) {
+        Serial.print("File: ");
+        Serial.println(file.name());
+        file = root.openNextFile();
+    }
+}
+
 void setup() {
   // Sprawdź przyczynę wybudzenia
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -1460,12 +1522,24 @@ void setup() {
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
 
-  // Inicjalizacja LittleFS
   if (!LittleFS.begin(true)) {
-    Serial.println("Error mounting LittleFS");
+    Serial.println("An Error has occurred while mounting LittleFS");
     return;
   }
-  Serial.println("LittleFS mounted successfully");
+
+  listFiles();
+
+  // Dodaj obsługę serwera plików
+  server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+
+  // Dodaj obsługę MIME types
+  server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->send(LittleFS, "/style.css", "text/css");
+  });
+
+  server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->send(LittleFS, "/script.js", "application/javascript");
+  });
 
   // Ładujemy konfigurację
   if(!loadConfig()) {
@@ -1502,6 +1576,14 @@ void setup() {
       }
     }
   }
+
+  // W setup() po połączeniu z WiFi:
+  syncRTCWithNTP();
+
+  // Endpoint testowy
+  server.on("/test", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->send(200, "text/plain", "Server is running!");
+  });
 
   // Konfiguracja pinów
   pinMode(BTN_UP, INPUT_PULLUP);
