@@ -40,9 +40,9 @@
 #include <DallasTemperature.h>
 #include <EEPROM.h>
 #include <BLEDevice.h>
-#include <BLEClient.h>
-#include <BLEUtils.h>
 #include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
