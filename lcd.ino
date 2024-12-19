@@ -1484,16 +1484,6 @@ void syncRTCWithNTP() {
     }
 }
 
-void listFiles() {
-    File root = LittleFS.open("/");
-    File file = root.openNextFile();
-    while(file) {
-        Serial.print("File: ");
-        Serial.println(file.name());
-        file = root.openNextFile();
-    }
-}
-
 void setup() {
   // Sprawdź przyczynę wybudzenia
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
