@@ -1548,24 +1548,24 @@ void setup() {
   loadSettings();
 
   // Konfiguracja WiFi
-  WiFi.mode(WIFI_STA);
-  if (strlen(wifiSettings.ssid) > 0) {
-    WiFi.begin(wifiSettings.ssid, wifiSettings.password);
-    // Czekaj maksymalnie 10 sekund na połączenie
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-      delay(500);
-      Serial.print(".");
-      attempts++;
-    }
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("\nConnected to WiFi");
-      // Jeśli NTP włączone, synchronizuj czas
-      if (timeSettings.ntpEnabled) {
-        synchronizeTime();
-      }
-    }
-  }
+  // WiFi.mode(WIFI_STA);
+  // if (strlen(wifiSettings.ssid) > 0) {
+  //   WiFi.begin(wifiSettings.ssid, wifiSettings.password);
+  //   // Czekaj maksymalnie 10 sekund na połączenie
+  //   int attempts = 0;
+  //   while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+  //     delay(500);
+  //     Serial.print(".");
+  //     attempts++;
+  //   }
+  //   if (WiFi.status() == WL_CONNECTED) {
+  //     Serial.println("\nConnected to WiFi");
+  //     // Jeśli NTP włączone, synchronizuj czas
+  //     if (timeSettings.ntpEnabled) {
+  //       synchronizeTime();
+  //     }
+  //   }
+  // }
 
   // W setup() po połączeniu z WiFi:
   syncRTCWithNTP();
